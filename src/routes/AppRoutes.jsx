@@ -5,7 +5,7 @@ import Login from "../pages/Login";
 import Signup from "../pages/Signup";
 
 import Dashboard from "../pages/Dashboard";
-import Employees from "../pages/Employees";
+import Employees from "../pages/Employee/Employees";
 import Attendance from "../pages/Attendance";
 import Payroll from "../pages/Payroll";
 import Reports from "../pages/Reports";

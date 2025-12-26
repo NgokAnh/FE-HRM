@@ -12,7 +12,7 @@ const INITIAL_DATA = {
   "2023-10-09": [{ employee: "Nguyễn Văn A", type: "hour", label: "08:00 - 17:00" }],
   "2023-10-10": [{ employee: "Trần Thị B", type: "shift", label: "Ca sáng" }],
   "2023-10-12": [{ employee: "Lê Văn C", type: "fixed", label: "Cố định" }],
-  "2023-10-12": [{ employee: "Nguyễn Văn A", type: "shift", label: "Ca chiều" }],
+  // "2023-10-12": [{ employee: "Nguyễn Văn A", type: "shift", label: "Ca chiều" }],
 };
 
 /* Helper: Định dạng Date thành YYYY-MM-DD */
