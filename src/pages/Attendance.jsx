@@ -97,7 +97,7 @@ export default function Attendance() {
       <div className="bg-white p-6 rounded-xl border space-y-4">
         <div className="flex flex-wrap gap-3">
           <FilterButton active={view === "day"} icon="today" onClick={() => setView("day")}>
-            Hôm nay
+            Theo ngày
           </FilterButton>
           <FilterButton active={view === "week"} icon="date_range" onClick={() => setView("week")}>
             Tuần này
@@ -105,6 +105,19 @@ export default function Attendance() {
           <FilterButton active={view === "month"} icon="calendar_month" onClick={() => setView("month")}>
             Tháng này
           </FilterButton>
+
+          {/* Date Picker - chỉ hiện khi view === "day" */}
+          {view === "day" && (
+            <div className="flex items-center gap-2 bg-gray-100 px-4 py-2 rounded-lg border">
+              <span className="material-symbols-outlined text-gray-500 text-[18px]">calendar_today</span>
+              <input
+                type="date"
+                value={selectedDate}
+                onChange={(e) => setSelectedDate(e.target.value)}
+                className="bg-transparent outline-none text-sm"
+              />
+            </div>
+          )}
         </div>
 
         <div className="flex gap-4">
