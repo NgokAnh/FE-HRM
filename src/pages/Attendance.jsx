@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import AttendanceSetting from "./AttendanceSetting";
 import { getActiveShifts } from "../api/shiftApi";
-import { getWorkSchedulesByDate } from "../api/workScheduleApi";
+import { getWorkSchedulesByDate, getWorkSchedulesByShiftAndDateRange } from "../api/workScheduleApi";
 import { getAttendanceByWorkSchedule } from "../api/attendanceApi";
 
 /* ================= MOCK DATA ================= */
@@ -75,12 +75,58 @@ const records = [
 
 /* ================= PAGE ================= */
 
+// Helper functions for week calculation
+function getWeekDates(date) {
+  const d = new Date(date);
+  const day = d.getDay();
+  const diff = d.getDate() - day + (day === 0 ? -6 : 1); // adjust when day is sunday
+  const monday = new Date(d.setDate(diff));
+
+  const dates = [];
+  for (let i = 0; i < 7; i++) {
+    const date = new Date(monday);
+    date.setDate(monday.getDate() + i);
+    dates.push(date.toISOString().split('T')[0]);
+  }
+  return dates;
+}
+
+function getWeekInfo(date) {
+  const d = new Date(date);
+  const firstDayOfMonth = new Date(d.getFullYear(), d.getMonth(), 1);
+  const firstMonday = new Date(firstDayOfMonth);
+  const dayOfWeek = firstDayOfMonth.getDay();
+  firstMonday.setDate(firstDayOfMonth.getDate() - (dayOfWeek === 0 ? 6 : dayOfWeek - 1));
+
+  const weekNumber = Math.ceil((d - firstMonday) / (7 * 24 * 60 * 60 * 1000)) + 1;
+  return {
+    weekNumber,
+    month: d.getMonth() + 1,
+    year: d.getFullYear()
+  };
+}
+
 export default function Attendance() {
   const [view, setView] = useState("day"); // day | week | month
+  const [weekViewMode, setWeekViewMode] = useState("byEmployee"); // byEmployee | byShift
   const [selectedDate, setSelectedDate] = useState(() => {
     const today = new Date();
     return today.toISOString().split('T')[0]; // YYYY-MM-DD
   });
+  const [selectedWeek, setSelectedWeek] = useState(() => {
+    const today = new Date();
+    return getWeekDates(today.toISOString().split('T')[0]);
+  });
+
+  const navigateWeek = (direction) => {
+    const currentMonday = new Date(selectedWeek[0]);
+    currentMonday.setDate(currentMonday.getDate() + (direction * 7));
+    setSelectedWeek(getWeekDates(currentMonday.toISOString().split('T')[0]));
+  };
+
+  const selectWeekByDate = (dateString) => {
+    setSelectedWeek(getWeekDates(dateString));
+  };
 
   return (
     <div className="space-y-6">
@@ -118,6 +164,37 @@ export default function Attendance() {
               />
             </div>
           )}
+
+          {/* Week View Mode Toggle - chỉ hiện khi view === "week" */}
+          {view === "week" && (
+            <>
+              <WeekPicker
+                selectedWeek={selectedWeek}
+                onNavigate={navigateWeek}
+                onSelectDate={selectWeekByDate}
+              />
+              <div className="flex items-center gap-2 ml-auto">
+                <button
+                  onClick={() => setWeekViewMode("byEmployee")}
+                  className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${weekViewMode === "byEmployee"
+                    ? "bg-blue-600 text-white"
+                    : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+                    }`}
+                >
+                  Xem theo nhân viên
+                </button>
+                <button
+                  onClick={() => setWeekViewMode("byShift")}
+                  className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${weekViewMode === "byShift"
+                    ? "bg-blue-600 text-white"
+                    : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+                    }`}
+                >
+                  Xem theo ca
+                </button>
+              </div>
+            </>
+          )}
         </div>
 
         <div className="flex gap-4">
@@ -138,7 +215,9 @@ export default function Attendance() {
 
       {/* TABLE */}
       {view === "day" && <DailyAttendanceTable selectedDate={selectedDate} />}
-      {view !== "day" && <SummaryAttendanceTable data={summaryData} />}
+      {view === "week" && weekViewMode === "byEmployee" && <SummaryAttendanceTable data={summaryData} />}
+      {view === "week" && weekViewMode === "byShift" && <WeekByShiftTable selectedWeek={selectedWeek} />}
+      {view === "month" && <SummaryAttendanceTable data={summaryData} />}
 
       {/* PAGINATION */}
       <div className="flex items-center justify-between p-4 text-sm text-gray-600 bg-white border rounded-xl">
@@ -153,6 +232,259 @@ export default function Attendance() {
 }
 
 /* ================= TABLES ================= */
+
+function WeekPicker({ selectedWeek, onNavigate, onSelectDate }) {
+  const [showCalendar, setShowCalendar] = useState(false);
+  const weekInfo = getWeekInfo(selectedWeek[0]);
+  const today = new Date().toISOString().split('T')[0];
+
+  return (
+    <div className="relative flex items-center gap-2 bg-gray-100 px-4 py-2 rounded-lg border">
+      <button
+        onClick={() => onNavigate(-1)}
+        className="hover:bg-gray-200 rounded p-1"
+      >
+        <span className="material-symbols-outlined text-[18px]">chevron_left</span>
+      </button>
+
+      <button
+        onClick={() => setShowCalendar(!showCalendar)}
+        className="text-sm font-medium hover:text-blue-600 px-2"
+      >
+        Tuần {weekInfo.weekNumber} - Th. {weekInfo.month}/{weekInfo.year}
+      </button>
+
+      <button
+        onClick={() => onNavigate(1)}
+        className="hover:bg-gray-200 rounded p-1"
+      >
+        <span className="material-symbols-outlined text-[18px]">chevron_right</span>
+      </button>
+
+      {showCalendar && (
+        <>
+          <div
+            className="fixed inset-0 z-10"
+            onClick={() => setShowCalendar(false)}
+          />
+          <div className="absolute top-full left-0 mt-2 bg-white border rounded-lg shadow-lg p-4 z-20">
+            <input
+              type="date"
+              value={today}
+              onChange={(e) => {
+                onSelectDate(e.target.value);
+                setShowCalendar(false);
+              }}
+              className="border rounded px-3 py-2 text-sm"
+            />
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
+function WeekByShiftTable({ selectedWeek }) {
+  const [shifts, setShifts] = useState([]);
+  const [shiftSchedules, setShiftSchedules] = useState({});
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+  const today = new Date().toISOString().split('T')[0];
+
+  const dayNames = ["Thứ 2", "Thứ 3", "Thứ 4", "Thứ 5", "Thứ 6", "Thứ 7", "Chủ nhật"];
+
+  useEffect(() => {
+    async function fetchData() {
+      setLoading(true);
+      setError(null);
+      try {
+        // 1. Fetch active shifts
+        const shiftsData = await getActiveShifts();
+        setShifts(shiftsData);
+
+        // 2. Fetch work schedules for each shift
+        const startDate = selectedWeek[0];
+        const endDate = selectedWeek[6];
+
+        const shiftSchedulesData = {};
+        await Promise.all(
+          shiftsData.map(async (shift) => {
+            try {
+              const data = await getWorkSchedulesByShiftAndDateRange(
+                shift.id,
+                startDate,
+                endDate
+              );
+
+              // Fetch attendance for each schedule
+              if (data && data.dailySchedules) {
+                for (const daily of data.dailySchedules) {
+                  for (const schedule of daily.schedules) {
+                    try {
+                      const attendance = await getAttendanceByWorkSchedule(
+                        schedule.id,
+                        schedule.employee.id
+                      );
+                      schedule.attendance = attendance;
+                    } catch (err) {
+                      schedule.attendance = null;
+                    }
+                  }
+                }
+              }
+
+              shiftSchedulesData[shift.id] = data;
+            } catch (err) {
+              console.error(`Error fetching schedules for shift ${shift.id}:`, err);
+              shiftSchedulesData[shift.id] = null;
+            }
+          })
+        );
+
+        setShiftSchedules(shiftSchedulesData);
+      } catch (err) {
+        console.error("Error fetching week attendance data:", err);
+        setError(err.message);
+      } finally {
+        setLoading(false);
+      }
+    }
+
+    fetchData();
+  }, [selectedWeek]);
+
+  if (loading) {
+    return (
+      <div className="bg-white rounded-xl border p-8 text-center">
+        <div className="text-gray-500">Đang tải dữ liệu...</div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="bg-white rounded-xl border p-8 text-center">
+        <div className="text-red-500">Lỗi: {error}</div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="bg-white rounded-xl border overflow-hidden">
+      <table className="w-full text-sm">
+        <thead className="bg-gray-50">
+          <tr>
+            <th className="p-4 text-left border-r">Ca làm việc</th>
+            {selectedWeek.map((date, index) => {
+              const dayNum = new Date(date).getDate();
+              const isToday = date === today;
+              return (
+                <th
+                  key={date}
+                  className={`p-4 text-center ${isToday ? 'bg-blue-50' : ''}`}
+                >
+                  <div className="space-y-1">
+                    <div className={`font-medium ${isToday ? 'text-blue-600' : ''}`}>
+                      {dayNames[index]}
+                    </div>
+                    <div className={`text-xs ${isToday ? 'text-blue-600 font-semibold' : 'text-gray-500'}`}>
+                      {dayNum}
+                    </div>
+                  </div>
+                </th>
+              );
+            })}
+          </tr>
+        </thead>
+
+        <tbody>
+          {shifts.map((shift) => (
+            <tr key={shift.id} className="border-t align-top">
+              {/* Column 1: Shift Info */}
+              <td className="p-4 border-r bg-gray-50">
+                <div className="space-y-1">
+                  <div className="font-semibold text-base">{shift.name}</div>
+                  <div className="text-gray-600 text-xs">
+                    {shift.startTime} - {shift.endTime}
+                  </div>
+                </div>
+              </td>
+
+              {/* Columns 2-8: Daily schedules */}
+              {selectedWeek.map((date) => {
+                const shiftData = shiftSchedules[shift.id];
+                const dailySchedule = shiftData?.dailySchedules?.find(
+                  (ds) => ds.date === date
+                );
+
+                return (
+                  <td key={date} className="p-2 align-top">
+                    <div className="flex flex-col gap-2">
+                      {dailySchedule?.schedules?.length > 0 ? (
+                        dailySchedule.schedules.map((schedule) => (
+                          <WeekEmployeeBox
+                            key={schedule.id}
+                            schedule={schedule}
+                            shift={shift}
+                          />
+                        ))
+                      ) : (
+                        <div className="text-gray-300 text-xs text-center py-2">-</div>
+                      )}
+                    </div>
+                  </td>
+                );
+              })}
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+function WeekEmployeeBox({ schedule, shift }) {
+  const { employee, attendance } = schedule;
+
+  const formatTime = (instantString) => {
+    if (!instantString) return "--";
+    try {
+      const date = new Date(instantString);
+      return date.toLocaleTimeString("vi-VN", {
+        hour: "2-digit",
+        minute: "2-digit",
+        hour12: false,
+      });
+    } catch (err) {
+      return "--";
+    }
+  };
+
+  const checkInTime = formatTime(attendance?.checkIn);
+  const checkOutTime = formatTime(attendance?.checkOut);
+
+  return (
+    <div
+      className="border rounded p-2 bg-gray-50 hover:bg-gray-100 transition-colors text-xs"
+      style={{
+        borderLeftWidth: '3px',
+        borderLeftColor: shift.colorCode || '#3B82F6'
+      }}
+    >
+      <div className="font-medium mb-1 truncate">{employee.fullname}</div>
+      <div className="space-y-0.5 text-[10px] text-gray-600">
+        <div className="flex justify-between">
+          <span>In:</span>
+          <span className="font-medium">{checkInTime}</span>
+        </div>
+        <div className="flex justify-between">
+          <span>Out:</span>
+          <span className="font-medium">{checkOutTime}</span>
+        </div>
+      </div>
+    </div>
+  );
+}
 
 function EmployeeAttendanceBox({ schedule, shift }) {
   const { employee, attendance } = schedule;
