@@ -1,42 +1,45 @@
-import React, { useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import CreateScheduleModal from "../components/work-schedule/CreateScheduleModal";
+import { getEmployees } from "../api/employeeApi";
+import { getWorkSchedulesByDate, deleteWorkSchedule } from "../api/workScheduleApi";
 
-/* ================= MOCK DATA ================= */
-const EMPLOYEES = [
-  { id: 1, name: "Nguyễn Văn A", code: "NV001" },
-  { id: 2, name: "Trần Thị B", code: "NV002" },
-  { id: 3, name: "Lê Văn C", code: "NV003" },
-];
-
-const INITIAL_DATA = {
-  "2023-10-09": [{ employee: "Nguyễn Văn A", type: "hour", label: "08:00 - 17:00" }],
-  "2023-10-10": [{ employee: "Trần Thị B", type: "shift", label: "Ca sáng" }],
-  "2023-10-12": [{ employee: "Lê Văn C", type: "fixed", label: "Cố định" }],
-  // "2023-10-12": [{ employee: "Nguyễn Văn A", type: "shift", label: "Ca chiều" }],
-};
-
-/* Helper: Định dạng Date thành YYYY-MM-DD */
+/* Helper: YYYY-MM-DD */
 const formatDateKey = (date) => {
   const year = date.getFullYear();
-  const month = String(date.getMonth() + 1).padStart(2, '0');
-  const day = String(date.getDate()).padStart(2, '0');
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
   return `${year}-${month}-${day}`;
 };
 
 export default function WorkSchedule() {
   const [mode, setMode] = useState("calendar"); // calendar | employee
-  const [isModalOpen, setIsModalOpen] = useState(false);
-  const [selectedDate, setSelectedDate] = useState(null);
-  const [calendarData] = useState(INITIAL_DATA);
 
-  // Mặc định tuần bắt đầu từ Chủ Nhật 08/10/2023
+  // ✅ modal state rõ ràng: add/edit + selected date + selected schedule
+  const [modalState, setModalState] = useState({
+    open: false,
+    mode: "add", // "add" | "edit"
+    dateKey: null,
+    schedule: null, // raw ws
+  });
+
+  const [employees, setEmployees] = useState([]);
+  const [schedules, setSchedules] = useState([]); // raw list ResWorkSchedule
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
+
+  // search theo nhân viên (client-side)
+  const [keyword, setKeyword] = useState("");
+
+  // week start
   const [weekStartDate, setWeekStartDate] = useState(new Date(2023, 9, 8));
 
-  const weekDays = Array.from({ length: 7 }, (_, i) => {
-    const day = new Date(weekStartDate);
-    day.setDate(weekStartDate.getDate() + i);
-    return day;
-  });
+  const weekDays = useMemo(() => {
+    return Array.from({ length: 7 }, (_, i) => {
+      const day = new Date(weekStartDate);
+      day.setDate(weekStartDate.getDate() + i);
+      return day;
+    });
+  }, [weekStartDate]);
 
   const changeWeek = (offset) => {
     const newDate = new Date(weekStartDate);
@@ -44,13 +47,136 @@ export default function WorkSchedule() {
     setWeekStartDate(newDate);
   };
 
-  const handleDateClick = (date) => {
-    setSelectedDate(date);
-    setIsModalOpen(true);
+  // ✅ click cell -> ADD
+  const openAddModal = (dateKey) => {
+    setModalState({ open: true, mode: "add", dateKey, schedule: null });
   };
 
-  const formatHeaderDate = (date) => `${String(date.getDate()).padStart(2, '0')}/${date.getMonth() + 1}`;
-  const headerTitle = `${formatHeaderDate(weekDays[0])} - ${formatHeaderDate(weekDays[6])}, ${weekDays[6].getFullYear()}`;
+  // ✅ click badge -> EDIT
+  const openEditModal = (dateKey, ws) => {
+    setModalState({ open: true, mode: "edit", dateKey, schedule: ws });
+  };
+
+  const closeModal = () => {
+    setModalState({ open: false, mode: "add", dateKey: null, schedule: null });
+  };
+
+  const formatHeaderDate = (date) =>
+    `${String(date.getDate()).padStart(2, "0")}/${date.getMonth() + 1}`;
+  const headerTitle = `${formatHeaderDate(weekDays[0])} - ${formatHeaderDate(
+    weekDays[6]
+  )}, ${weekDays[6].getFullYear()}`;
+
+  // fetch employees + schedules of week
+  const fetchWeekData = async () => {
+    try {
+      setLoading(true);
+      setError("");
+
+      const er = await getEmployees();
+      const eData = er?.data ?? er;
+      setEmployees(Array.isArray(eData) ? eData : []);
+
+      const dateKeys = weekDays.map((d) => formatDateKey(d));
+      const results = await Promise.all(
+        dateKeys.map((dk) => getWorkSchedulesByDate(dk).catch(() => []))
+      );
+
+      const merged = results.flat();
+      setSchedules(Array.isArray(merged) ? merged : []);
+    } catch (e) {
+      setError(e?.message || "Không tải được lịch làm việc");
+      setSchedules([]);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchWeekData();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [weekStartDate]);
+
+  // lock scroll khi mở modal
+  useEffect(() => {
+    document.body.style.overflow = modalState.open ? "hidden" : "auto";
+    return () => (document.body.style.overflow = "auto");
+  }, [modalState.open]);
+
+  /**
+   * ✅ map schedules -> calendarData kiểu:
+   * { "YYYY-MM-DD": [ { id, employee, label, color, ws } ] }
+   */
+  const calendarData = useMemo(() => {
+    const map = {};
+    for (const ws of schedules) {
+      const dateKey = ws?.workDate || ws?.date || ws?.work_date;
+      if (!dateKey) continue;
+
+      const empName =
+        ws?.employee?.fullname ||
+        ws?.employee?.name ||
+        ws?.employeeName ||
+        "—";
+
+      const shiftName = ws?.shift?.name || ws?.shiftName || "Ca";
+
+      const start = normalizeTime(ws?.shift?.startTime || ws?.startTime);
+      const end = normalizeTime(ws?.shift?.endTime || ws?.endTime);
+
+      const label =
+        start !== "—" && end !== "—"
+          ? `${shiftName} (${start}-${end})`
+          : shiftName;
+
+      const color = ws?.shift?.colorCode || "#22c55e";
+
+      const ev = {
+        id: ws?.id,     // ✅ cần để delete/update
+        employee: empName,
+        label,
+        color,
+        ws,             // ✅ giữ raw object để edit
+      };
+
+      map[dateKey] = map[dateKey] ? [...map[dateKey], ev] : [ev];
+    }
+    return map;
+  }, [schedules]);
+
+  // employee list filter (client-side)
+  const displayedEmployees = useMemo(() => {
+    const k = keyword.trim().toLowerCase();
+    if (!k) return employees;
+
+    return employees.filter((e) => {
+      const name = String(e.fullname ?? e.name ?? "").toLowerCase();
+      const email = String(e.email ?? "").toLowerCase();
+      const phone = String(e.phone ?? "").toLowerCase();
+      const id = String(e.id ?? "").toLowerCase();
+      return (
+        name.includes(k) || email.includes(k) || phone.includes(k) || id.includes(k)
+      );
+    });
+  }, [employees, keyword]);
+
+  // ✅ delete inline
+  const handleDeleteInline = async (ev) => {
+    const ok = window.confirm(`Xóa lịch của "${ev.employee}"?`);
+    if (!ok) return;
+
+    try {
+      setLoading(true);
+      setError("");
+      await deleteWorkSchedule(ev.id);
+      // update UI ngay
+      setSchedules((prev) => prev.filter((x) => x.id !== ev.id));
+    } catch (e) {
+      setError(e?.message || "Xóa lịch thất bại");
+    } finally {
+      setLoading(false);
+    }
+  };
 
   return (
     <div className="space-y-6">
@@ -66,16 +192,34 @@ export default function WorkSchedule() {
       {/* FILTER SECTION */}
       <div className="bg-white rounded-xl p-6 border shadow-sm flex gap-4 items-center">
         <div className="flex bg-gray-100 p-1 rounded-lg shrink-0">
-          <ModeTab active={mode === "calendar"} onClick={() => setMode("calendar")}>Theo lịch</ModeTab>
-          <ModeTab active={mode === "employee"} onClick={() => setMode("employee")}>Theo nhân viên</ModeTab>
+          <ModeTab active={mode === "calendar"} onClick={() => setMode("calendar")}>
+            Theo lịch
+          </ModeTab>
+          <ModeTab active={mode === "employee"} onClick={() => setMode("employee")}>
+            Theo nhân viên
+          </ModeTab>
         </div>
+
         <div className="flex-1 flex items-center gap-2 bg-gray-100 px-4 py-2 rounded-lg border border-transparent focus-within:ring-2 focus-within:ring-blue-100 transition-all">
           <span className="material-symbols-outlined text-gray-500">search</span>
-          <input className="bg-transparent outline-none flex-1 text-sm" placeholder="Tìm theo tên nhân viên..." />
+          <input
+            value={keyword}
+            onChange={(e) => setKeyword(e.target.value)}
+            className="bg-transparent outline-none flex-1 text-sm"
+            placeholder="Tìm theo tên / email / SĐT / ID..."
+          />
         </div>
-        <FilterSelect label="Phòng ban" />
-        <button className="px-4 py-2 rounded-lg bg-blue-600 text-white hover:bg-blue-700 text-sm font-medium shadow-sm">Áp dụng</button>
+
+        <button
+          onClick={() => setKeyword("")}
+          className="px-4 py-2 rounded-lg bg-gray-100 hover:bg-gray-200 text-sm font-medium"
+        >
+          Xóa lọc
+        </button>
       </div>
+
+      {loading && <div className="text-gray-600">Đang tải...</div>}
+      {error && <div className="text-red-600">{error}</div>}
 
       {/* CALENDAR/EMPLOYEE VIEW */}
       <div className="bg-white rounded-xl border overflow-hidden shadow-sm">
@@ -83,39 +227,144 @@ export default function WorkSchedule() {
         <div className="flex items-center justify-between px-6 py-4 border-b">
           <div className="flex items-center gap-4">
             <div className="flex border rounded-lg overflow-hidden">
-              <button onClick={() => changeWeek(-7)} className="px-3 py-1.5 hover:bg-gray-50 border-r">‹</button>
-              <button onClick={() => changeWeek(7)} className="px-3 py-1.5 hover:bg-gray-50">›</button>
+              <button onClick={() => changeWeek(-7)} className="px-3 py-1.5 hover:bg-gray-50 border-r">
+                ‹
+              </button>
+              <button onClick={() => changeWeek(7)} className="px-3 py-1.5 hover:bg-gray-50">
+                ›
+              </button>
             </div>
             <h2 className="text-lg font-semibold text-gray-800">{headerTitle}</h2>
           </div>
-          <div className="flex gap-4">
+
+          <div className="flex gap-4 items-center">
             <LegendItem color="bg-green-500" label="Theo ca" />
-            <LegendItem color="bg-orange-400" label="Theo giờ" />
-            <LegendItem color="bg-blue-500" label="Cố định" />
+            <div className="text-xs text-gray-500">
+              <b>Tip:</b> Click ô ngày để <b>thêm</b> • Click item để <b>sửa</b> • Bấm <b>×</b> để <b>xóa</b>
+            </div>
           </div>
         </div>
 
         {mode === "calendar" ? (
-          /* CHẾ ĐỘ XEM THEO LỊCH (Grid 7 ngày) */
           <>
             <div className="grid grid-cols-7 text-center py-3 bg-gray-50 border-b text-[11px] font-bold text-gray-400 uppercase tracking-wider">
               {["CN", "T2", "T3", "T4", "T5", "T6", "T7"].map((d, i) => (
-                <div key={d}>{d} ({String(weekDays[i].getDate()).padStart(2, '0')})</div>
+                <div key={d}>
+                  {d} ({String(weekDays[i].getDate()).padStart(2, "0")})
+                </div>
               ))}
             </div>
+
             <div className="grid grid-cols-7">
               {weekDays.map((date, i) => {
                 const dateKey = formatDateKey(date);
                 const events = calendarData[dateKey] || [];
+
                 return (
-                  <div key={i} onClick={() => handleDateClick(dateKey)} className="min-h-[200px] p-3 border-r border-gray-100 hover:bg-gray-50/50 cursor-pointer last:border-r-0 group">
-                    <div className="text-sm font-bold mb-3 text-gray-400 group-hover:text-blue-600 transition-colors">Ngày {date.getDate()}</div>
-                    <div className="space-y-1.5">
-                      {events.map((ev, idx) => (
-                        <div key={idx} className={`text-[10px] px-2 py-1 rounded-md font-bold border flex items-center gap-1 ${getBadgeStyle(ev.type)}`}>
-                          <span className="truncate">{ev.employee.split(' ').pop()}: {ev.label}</span>
-                        </div>
-                      ))}
+                  <div
+                    key={i}
+                    onClick={() => openAddModal(dateKey)} // ✅ click cell -> add
+                    className="min-h-[260px] p-3 border-r border-gray-100 hover:bg-gray-50/50 cursor-pointer last:border-r-0 group relative"
+                    title="Click để thêm lịch"
+                  >
+                    <div className="flex items-center justify-between mb-3">
+                      <div className="text-sm font-bold text-gray-400 group-hover:text-blue-600 transition-colors">
+                        Ngày {date.getDate()}
+                      </div>
+
+                      {/* ✅ nút + rõ ràng */}
+                      <button
+                        className="opacity-0 group-hover:opacity-100 transition-opacity text-xs px-2 py-1 rounded-md bg-blue-600 text-white shadow-sm"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          openAddModal(dateKey);
+                        }}
+                        title="Thêm lịch"
+                      >
+                        + Thêm
+                      </button>
+                    </div>
+                    <div className="space-y-2 max-h-[500px] overflow-auto pr-1">
+
+                      {events.map((ev, idx) => {
+                        const ws = ev.ws;
+                        const emp = ws?.employee?.fullname || ws?.employeeName || ev.employee || "—";
+                        const shiftName = ws?.shift?.name || ws?.shiftName || "—";
+                        const start = normalizeTime(ws?.shift?.startTime || ws?.startTime);
+                        const end = normalizeTime(ws?.shift?.endTime || ws?.endTime);
+                        const siteName = ws?.workSite?.name || ws?.workSiteName || "Cơ sở #1"; // tuỳ BE trả
+                        const note = ws?.note || ws?.description || ""; // nếu có
+
+                        const textColor = pickTextColor(ev.color);
+                        return (
+                          <div
+                            key={ev.id ?? idx}
+                            className="relative rounded-xl border px-3 py-2 shadow-sm pr-12"
+                            style={{
+                              backgroundColor: hexToRgba(ev.color, 0.22),
+                              borderColor: hexToRgba(ev.color, 0.5),
+                              color: textColor,
+                            }}
+                          >
+                            {/* ✅ nút X float, không chiếm layout */}
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleDeleteInline(ev);
+                              }}
+                              className="absolute right-2 top-2 -translate-y-1
+                 w-5 h-5 rounded-md grid place-items-center
+                 text-[11px] font-black leading-none
+                 bg-black/10 hover:bg-black/20"
+                              title="Xóa lịch"
+                            >
+                              ×
+                            </button>
+
+                            {/* ✅ content luôn nằm trong vùng an toàn (nhờ pr-12) */}
+                            <div className="min-w-0">
+                              {/* dòng 1 */}
+                              <div className="flex items-center gap-2 min-w-0">
+                                <span
+                                  className="w-2.5 h-2.5 rounded-full border shrink-0"
+                                  style={{ backgroundColor: ev.color, borderColor: hexToRgba(ev.color, 0.9) }}
+                                />
+                                <div className="font-bold text-[12px] truncate min-w-0">{emp}</div>
+                              </div>
+
+                              {/* dòng 2 */}
+                              {shiftName ? (
+                                <div className="mt-1 text-[11px] font-semibold opacity-95 truncate">
+                                  {shiftName}
+                                </div>
+                              ) : null}
+                            </div>
+
+                            {/* details */}
+                            <div className="mt-2 space-y-1 text-[11px] leading-snug opacity-95">
+                              {/* giờ */}
+                              <div className="flex items-center gap-2">
+                                <span className="font-semibold">{start} - {end}</span>
+                              </div>
+
+                              {/* worksite 1 hàng riêng */}
+                              <div className="font-semibold truncate">
+                                {siteName || "Chưa gán địa điểm"}
+                              </div>
+
+                              {/* note: nếu muốn giới hạn 2 dòng, dùng line-clamp */}
+                              {!!note && (
+                                <div className="flex items-start gap-2">
+                                  <span className="opacity-80 shrink-0">📝</span>
+                                  <span className="min-w-0 line-clamp-2">{note}</span>
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        );
+
+                      })}
+
                     </div>
                   </div>
                 );
@@ -123,35 +372,97 @@ export default function WorkSchedule() {
             </div>
           </>
         ) : (
-          /* CHẾ ĐỘ XEM THEO NHÂN VIÊN (Dạng hàng ngang) */
           <div className="overflow-x-auto">
             <div className="min-w-[1000px]">
-              {/* Header hàng ngang */}
               <div className="grid grid-cols-[220px_repeat(7,1fr)] bg-gray-50 border-b text-[11px] font-bold text-gray-400 uppercase">
                 <div className="p-4 border-r">Nhân viên</div>
                 {["CN", "T2", "T3", "T4", "T5", "T6", "T7"].map((d, i) => (
                   <div key={d} className="p-4 text-center border-r last:border-r-0">
-                    {d} ({String(weekDays[i].getDate()).padStart(2, '0')})
+                    {d} ({String(weekDays[i].getDate()).padStart(2, "0")})
                   </div>
                 ))}
               </div>
-              {/* Body hàng ngang */}
-              {EMPLOYEES.map((emp) => (
-                <div key={emp.id} className="grid grid-cols-[220px_repeat(7,1fr)] border-b last:border-b-0 hover:bg-gray-50/30 transition-colors">
+
+              {displayedEmployees.map((emp) => (
+                <div
+                  key={emp.id}
+                  className="grid grid-cols-[220px_repeat(7,1fr)] border-b last:border-b-0 hover:bg-gray-50/30 transition-colors"
+                >
                   <div className="p-4 border-r flex flex-col justify-center">
-                    <div className="font-bold text-gray-800 text-sm">{emp.name}</div>
-                    <div className="text-[11px] text-gray-400">{emp.code}</div>
+                    <div className="font-bold text-gray-800 text-sm">{emp.fullname || emp.name}</div>
+                    <div className="text-[11px] text-gray-400">{emp.email || emp.phone || `ID: ${emp.id}`}</div>
                   </div>
+
                   {weekDays.map((date, i) => {
                     const dateKey = formatDateKey(date);
-                    const empEvents = (calendarData[dateKey] || []).filter(ev => ev.employee === emp.name);
+                    const empName = emp.fullname || emp.name || "";
+                    const empEvents = (calendarData[dateKey] || []).filter((ev) => ev.employee === empName);
+
                     return (
-                      <div key={i} onClick={() => handleDateClick(dateKey)} className="p-2 border-r last:border-r-0 min-h-[80px] flex flex-col gap-1 cursor-pointer hover:bg-blue-50/20">
-                        {empEvents.map((ev, idx) => (
-                          <div key={idx} className={`text-[10px] px-2 py-1.5 rounded-lg font-bold border text-center ${getBadgeStyle(ev.type)}`}>
-                            {ev.label}
-                          </div>
-                        ))}
+                      <div
+                        key={i}
+                        onClick={() => openAddModal(dateKey)}
+                        className="p-2 border-r last:border-r-0 min-h-[80px] flex flex-col gap-1 cursor-pointer hover:bg-blue-50/20 group"
+                        title="Click để thêm lịch"
+                      >
+                        {empEvents.map((ev, idx) => {
+                          const ws = ev.ws;
+                          const shiftName = ws?.shift?.name || ws?.shiftName || "—";
+                          const start = normalizeTime(ws?.shift?.startTime || ws?.startTime);
+                          const end = normalizeTime(ws?.shift?.endTime || ws?.endTime);
+                          const siteName = ws?.workSite?.name || ws?.workSiteName || "Cơ sở #1";
+
+                          const textColor = pickTextColor(ev.color);
+
+                          return (
+                            <div
+                              key={ev.id ?? idx}
+                              className="relative rounded-lg border px-2.5 py-2 shadow-sm"
+                              style={{
+                                backgroundColor: hexToRgba(ev.color, 0.22),
+                                borderColor: hexToRgba(ev.color, 0.5),
+                                color: textColor,
+                              }}
+                            >
+                              <div className="flex items-start justify-between gap-2">
+                                <div className="min-w-0">
+                                  <div className="text-[11px] font-bold truncate">{shiftName}</div>
+                                  <div className="text-[10.5px] font-semibold opacity-95 mt-0.5">
+                                    {start} - {end}
+                                  </div>
+                                  <div className="text-[10.5px] opacity-90 truncate mt-0.5">
+                                    📍 {siteName}
+                                  </div>
+                                </div>
+
+                                <div className="flex flex-col gap-1 shrink-0">
+                                  <button
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      openEditModal(dateKey, ws);
+                                    }}
+                                    className="px-2 py-1 rounded-md text-[10px] font-bold bg-black/10 hover:bg-black/20"
+                                    title="Sửa"
+                                  >
+                                    Sửa
+                                  </button>
+
+                                  <button
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      handleDeleteInline(ev);
+                                    }}
+                                    className="px-2 py-1 rounded-md text-[10px] font-bold bg-black/10 hover:bg-black/20"
+                                    title="Xóa"
+                                  >
+                                    Xóa
+                                  </button>
+                                </div>
+                              </div>
+                            </div>
+                          );
+                        })}
+
                       </div>
                     );
                   })}
@@ -162,23 +473,34 @@ export default function WorkSchedule() {
         )}
       </div>
 
-      <CreateScheduleModal open={isModalOpen} onClose={() => setIsModalOpen(false)} selectedDate={selectedDate} employees={EMPLOYEES} />
+      {/* ✅ Modal: truyền thêm mode + schedule để edit */}
+      <CreateScheduleModal
+        open={modalState.open}
+        onClose={closeModal}
+        selectedDate={modalState.dateKey}
+        mode={modalState.mode}              // "add" | "edit"
+        schedule={modalState.schedule}      // raw ws
+        onSaved={() => {
+          closeModal();
+          fetchWeekData();
+        }}
+        onDeleted={() => {
+          closeModal();
+          fetchWeekData();
+        }}
+      />
     </div>
   );
 }
 
 /* ================= COMPONENT PHỤ ================= */
-function FilterSelect({ label }) {
-  return (
-    <button className="flex items-center gap-2 px-4 py-2 bg-gray-100 rounded-lg text-sm font-medium hover:bg-gray-200 transition-colors">
-      {label} <span className="material-symbols-outlined text-[18px]">expand_more</span>
-    </button>
-  );
-}
-
 function ModeTab({ active, children, onClick }) {
   return (
-    <button onClick={onClick} className={`px-4 py-1.5 rounded-md text-xs font-semibold transition-all ${active ? "bg-white shadow-sm text-blue-600" : "text-gray-500 hover:text-gray-700"}`}>
+    <button
+      onClick={onClick}
+      className={`px-4 py-1.5 rounded-md text-xs font-semibold transition-all ${active ? "bg-white shadow-sm text-blue-600" : "text-gray-500 hover:text-gray-700"
+        }`}
+    >
       {children}
     </button>
   );
@@ -192,11 +514,31 @@ function LegendItem({ color, label }) {
   );
 }
 
-const getBadgeStyle = (type) => {
-  const map = { 
-    shift: "bg-green-50 text-green-700 border-green-100", 
-    hour: "bg-orange-50 text-orange-700 border-orange-100", 
-    fixed: "bg-blue-50 text-blue-700 border-blue-100" 
-  };
-  return map[type] || "bg-gray-50 text-gray-700 border-gray-100";
-};
+function normalizeTime(t) {
+  if (!t) return "—";
+  const s = String(t);
+  if (/^\d{2}:\d{2}:\d{2}$/.test(s)) return s.slice(0, 5);
+  if (/^\d{2}:\d{2}$/.test(s)) return s;
+  return s;
+}
+
+function hexToRgba(hex, alpha = 0.1) {
+  if (!hex || typeof hex !== "string") return `rgba(34,197,94,${alpha})`;
+  const h = hex.replace("#", "");
+  if (h.length !== 6) return `rgba(34,197,94,${alpha})`;
+  const r = parseInt(h.slice(0, 2), 16);
+  const g = parseInt(h.slice(2, 4), 16);
+  const b = parseInt(h.slice(4, 6), 16);
+  return `rgba(${r},${g},${b},${alpha})`;
+}
+
+function pickTextColor(hex) {
+  if (!hex || typeof hex !== "string") return "#0f172a";
+  const h = hex.replace("#", "");
+  if (h.length !== 6) return "#0f172a";
+  const r = parseInt(h.slice(0, 2), 16);
+  const g = parseInt(h.slice(2, 4), 16);
+  const b = parseInt(h.slice(4, 6), 16);
+  const luminance = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
+  return luminance > 0.6 ? "#0f172a" : "#000";
+}
