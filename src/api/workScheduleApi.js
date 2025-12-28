@@ -151,4 +151,22 @@ export async function existsWorkSchedule(employeeId, shiftId, workDate) {
 
   const data = await fetchJson(`${BASE_URL}/exists?${qs}`);
   return !!data;
+
+/**
+ * Lấy danh sách phân công làm việc của một ca trong khoảng thời gian
+ * GET /api/v1/work-schedules/shift/{shiftId}/date-range?startDate=...&endDate=...
+ * @param {number} shiftId - ID của ca làm việc
+ * @param {string} startDate - Ngày bắt đầu (YYYY-MM-DD)
+ * @param {string} endDate - Ngày kết thúc (YYYY-MM-DD)
+ * @returns {Promise<Object>} ResShiftListWorkSchedule
+ */
+export async function getWorkSchedulesByShiftAndDateRange(shiftId, startDate, endDate) {
+    if (!shiftId) throw new Error("shiftId is required");
+    if (!startDate) throw new Error("startDate is required");
+    if (!endDate) throw new Error("endDate is required");
+
+    const data = await fetchJson(
+        `${BASE_URL}/shift/${shiftId}/date-range?startDate=${startDate}&endDate=${endDate}`
+    );
+    return data;
 }
