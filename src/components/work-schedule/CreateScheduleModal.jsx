@@ -163,7 +163,6 @@ export default function CreateScheduleModal({
             return;
           }
         }
-console.log("Updating work schedule ID", id, "with payload:", basePayload);
         await updateWorkSchedule(id, basePayload);
         onSaved?.();
         onClose?.();
@@ -291,9 +290,19 @@ console.log("Updating work schedule ID", id, "with payload:", basePayload);
 
           {/* date */}
           <div className="space-y-2">
-            <div className="text-[12px] font-bold text-slate-500 uppercase tracking-widest">Ngày áp dụng</div>
-            <DatePickerNativeDMY valueISO={workDateISO} onChangeISO={setWorkDateISO} />
-          </div>
+  <div className="text-[12px] font-bold text-slate-500 uppercase tracking-widest">
+    Ngày áp dụng
+  </div>
+
+  <input
+    type="text"
+    value={isoToDMY(workDateISO) || "—"}
+    readOnly
+    className="w-full p-3.5 bg-slate-50 border border-slate-200 rounded-xl text-[15px]
+               font-semibold text-center text-slate-700 cursor-not-allowed"
+  />
+</div>
+
 
           {/* repeat daily only on ADD */}
           {!isEdit && (
@@ -311,7 +320,7 @@ console.log("Updating work schedule ID", id, "with payload:", basePayload);
               {repeatDaily && (
                 <div>
                   <div className="text-[13px] font-semibold text-slate-600">Lặp đến ngày</div>
-                  <DatePickerNativeDMY valueISO={repeatUntil} onChangeISO={setRepeatUntil} />
+                  <DatePickerNativeDMY valueISO={repeatUntil} onChangeISO={setRepeatUntil} minISO={workDateISO} />
                 </div>
               )}
             </div>
@@ -345,17 +354,29 @@ function normalizeTime(t) {
 }
 
 function addDaysISO(iso, days) {
-  const d = new Date(iso + "T00:00:00");
-  d.setDate(d.getDate() + days);
+  // xử lý theo UTC để không bị lệch ngày
+  const d = new Date(iso + "T00:00:00Z");
+  d.setUTCDate(d.getUTCDate() + days);
   return d.toISOString().slice(0, 10);
 }
 
 function buildDailyDates(startISO, endISO) {
   const out = [];
   let cur = startISO;
-  while (cur <= endISO) {
+
+  // so sánh bằng Date UTC cho chắc
+  const end = new Date(endISO + "T00:00:00Z");
+
+  while (new Date(cur + "T00:00:00Z") <= end) {
     out.push(cur);
     cur = addDaysISO(cur, 1);
   }
   return out;
+}
+function isoToDMY(iso) {
+  if (!iso) return "";
+  const m = String(iso).match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (!m) return "";
+  const [, y, mo, d] = m;
+  return `${d}-${mo}-${y}`;
 }

@@ -1,7 +1,6 @@
 import React, { useMemo, useRef } from "react";
 
 function isoToDMY(iso) {
-  // iso: yyyy-mm-dd
   if (!iso) return "";
   const m = iso.match(/^(\d{4})-(\d{2})-(\d{2})$/);
   if (!m) return "";
@@ -10,19 +9,19 @@ function isoToDMY(iso) {
 }
 
 export default function DatePickerNativeDMY({
-  valueISO,           // "yyyy-mm-dd"
-  onChangeISO,        // (newISO) => void
+  valueISO,
+  onChangeISO,
+  minISO,                // ✅ thêm
+  maxISO,                // (tuỳ chọn)
   placeholder = "Chọn ngày",
   className = "",
   disabled = false,
 }) {
   const hiddenRef = useRef(null);
-
   const displayValue = useMemo(() => isoToDMY(valueISO), [valueISO]);
 
   const openPicker = () => {
     if (disabled) return;
-    // showPicker support (Chrome/Edge), fallback focus+click
     const el = hiddenRef.current;
     if (!el) return;
 
@@ -35,7 +34,6 @@ export default function DatePickerNativeDMY({
 
   return (
     <div className="relative">
-      {/* Input hiển thị dd-mm-yyyy */}
       <input
         type="text"
         readOnly
@@ -48,7 +46,6 @@ export default function DatePickerNativeDMY({
                     disabled:opacity-60 disabled:cursor-not-allowed ${className}`}
       />
 
-      {/* Icon dropdown */}
       <div
         onClick={openPicker}
         className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 cursor-pointer"
@@ -57,12 +54,13 @@ export default function DatePickerNativeDMY({
         ▼
       </div>
 
-      {/* Input date native ẨN để mở picker */}
       <input
         ref={hiddenRef}
         type="date"
         value={valueISO || ""}
-        onChange={(e) => onChangeISO?.(e.target.value)} // trả về yyyy-mm-dd
+        min={minISO || undefined}
+        max={maxISO || undefined}
+        onChange={(e) => onChangeISO?.(e.target.value)}
         className="absolute inset-0 opacity-0 pointer-events-none"
         tabIndex={-1}
       />

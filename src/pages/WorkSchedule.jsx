@@ -237,12 +237,7 @@ export default function WorkSchedule() {
             <h2 className="text-lg font-semibold text-gray-800">{headerTitle}</h2>
           </div>
 
-          <div className="flex gap-4 items-center">
-            <LegendItem color="bg-green-500" label="Theo ca" />
-            <div className="text-xs text-gray-500">
-              <b>Tip:</b> Click ô ngày để <b>thêm</b> • Click item để <b>sửa</b> • Bấm <b>×</b> để <b>xóa</b>
-            </div>
-          </div>
+
         </div>
 
         {mode === "calendar" ? (
@@ -296,9 +291,16 @@ export default function WorkSchedule() {
                         Ngày {date.getDate()}
                       </div>
 
-                      {/* ✅ nút + rõ ràng */}
                       <button
-                        className="opacity-0 group-hover:opacity-100 transition-opacity text-xs px-2 py-1 rounded-md bg-blue-600 text-white shadow-sm"
+                        className="
+    opacity-0 translate-y-1 scale-95 font-bold
+    group-hover:opacity-100 group-hover:translate-y-0 group-hover:scale-100
+    transition-all duration-200 ease-out
+    text-xs px-2 py-1 rounded-md
+    bg-blue-400 text-white shadow-sm
+    hover:bg-blue-700 hover:shadow-md
+    active:scale-95
+  "
                         onClick={(e) => {
                           e.stopPropagation();
                           openAddModal(dateKey);
@@ -307,6 +309,7 @@ export default function WorkSchedule() {
                       >
                         + Thêm
                       </button>
+
                     </div>
                     <div className="space-y-2 max-h-[500px] overflow-auto pr-1">
 
@@ -352,7 +355,7 @@ export default function WorkSchedule() {
                                 className="
       pointer-events-auto
       w-5 h-5 rounded-md grid place-items-center
-      bg-black/10 hover:bg-black/20 backdrop-blur
+      bg-black/10 hover:bg-black/40 backdrop-blur
     "
                                 title="Sửa"
                                 aria-label="Sửa"
@@ -372,7 +375,7 @@ export default function WorkSchedule() {
           pointer-events-auto
           h-5 w-5 rounded-md grid place-items-center
           text-[11px] font-black leading-none
-          bg-black/10 hover:bg-black/20
+          bg-black/10 hover:bg-black/40
           backdrop-blur
         "
                                 title="Xóa lịch"
