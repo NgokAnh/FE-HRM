@@ -14,7 +14,6 @@ const formatDateKey = (date) => {
 export default function WorkSchedule() {
   const [mode, setMode] = useState("calendar"); // calendar | employee
 
-  // ✅ modal state rõ ràng: add/edit + selected date + selected schedule
   const [modalState, setModalState] = useState({
     open: false,
     mode: "add", // "add" | "edit"
@@ -291,16 +290,16 @@ export default function WorkSchedule() {
                         Ngày {date.getDate()}
                       </div>
 
-                      <button
+                      {!loading && <button
                         className="
-    opacity-0 translate-y-1 scale-95 font-bold
-    group-hover:opacity-100 group-hover:translate-y-0 group-hover:scale-100
-    transition-all duration-200 ease-out
-    text-xs px-2 py-1 rounded-md
-    bg-blue-400 text-white shadow-sm
-    hover:bg-blue-700 hover:shadow-md
-    active:scale-95
-  "
+                          opacity-0 translate-y-1 scale-95 font-bold
+                          group-hover:opacity-100 group-hover:translate-y-0 group-hover:scale-100
+                          transition-all duration-200 ease-out
+                          text-xs px-2 py-1 rounded-md
+                          bg-blue-400 text-white shadow-sm
+                          hover:bg-blue-700 hover:shadow-md
+                          active:scale-95
+                        "
                         onClick={(e) => {
                           e.stopPropagation();
                           openAddModal(dateKey);
@@ -308,7 +307,7 @@ export default function WorkSchedule() {
                         title="Thêm lịch"
                       >
                         + Thêm
-                      </button>
+                      </button>}
 
                     </div>
                     <div className="space-y-2 max-h-[500px] overflow-auto pr-1">
