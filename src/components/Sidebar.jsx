@@ -3,6 +3,7 @@ import { NavLink, useNavigate } from "react-router-dom";
 const menus = [
   { label: "Dashboard", to: "/admin", icon: "dashboard" },
   { label: "Nhân viên", to: "/admin/employees", icon: "groups" },
+  { label: "Ca làm việc", to: "/admin/shift", icon: "schedule" },
   { label: "Chấm công", to: "/admin/attendance", icon: "fact_check" },
   { label: "Lịch làm việc", to: "/admin/schedule", icon: "calendar_month" },
   { label: "Bảng lương", to: "/admin/payroll", icon: "payments" },

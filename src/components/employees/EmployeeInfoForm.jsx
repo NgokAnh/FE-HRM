@@ -1,79 +1,70 @@
-import FormSection from "../common/FormSection";
-import { Input } from "../common/Input";
-import { Select } from "../common/Select";
-
-export default function EmployeeInfoForm() {
+export default function EmployeeInfoForm({ value, onChange, placeholders }) {
   return (
-    <div className="space-y-8">
-
-      {/* ẢNH ĐẠI DIỆN */}
-      <FormSection title="Ảnh đại diện">
-        <div className="flex items-center gap-6">
-          <div className="w-20 h-20 rounded-full bg-gray-200 flex items-center justify-center">
-            <span className="material-symbols-outlined text-3xl">
-              person
-            </span>
-          </div>
-
-          <div className="flex gap-3">
-            <button className="bg-blue-600 text-white px-4 py-2 rounded-lg">
-              Tải ảnh lên
-            </button>
-            <button className="px-4 py-2 border rounded-lg">
-              Xóa
-            </button>
-          </div>
-        </div>
-      </FormSection>
-
-      {/* THÔNG TIN CÁ NHÂN */}
-      <FormSection title="Thông tin cá nhân">
-        <div className="grid grid-cols-2 gap-6">
-          <Input label="Họ và tên *" placeholder="Ví dụ: Nguyễn Văn A" />
-          <Input label="Ngày sinh" type="date" />
-
-          <Select label="Giới tính">
-            <option>Chọn giới tính</option>
-          </Select>
-
-          <Input label="Số điện thoại" placeholder="0905 xxx xxx" />
-
-          <Input label="Email" placeholder="email@company.com" />
-          <Input label="CCCD/CMND" placeholder="Nhập số thẻ định danh" />
-
-          <Input
-            label="Địa chỉ hiện tại"
-            placeholder="Số nhà, tên đường, phường/xã..."
-            full
+    <div className="space-y-5">
+      {/* Row 1 */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+        <Field label="Họ và tên">
+          <input
+            value={value.fullname}
+            onChange={(e) => onChange("fullname", e.target.value)}
+            placeholder={placeholders?.fullname || "Nhập họ và tên"}
+            className="w-full px-4 py-2 rounded-lg border outline-none focus:ring-2 focus:ring-blue-200"
           />
-        </div>
-      </FormSection>
+        </Field>
 
-      {/* THÔNG TIN CÔNG VIỆC */}
-      <FormSection title="Thông tin công việc">
-        <div className="grid grid-cols-2 gap-6">
-          <Input label="Mã nhân viên" value="NV-2023-108" />
+        <Field label="Email">
+          <input
+            value={value.email}
+            onChange={(e) => onChange("email", e.target.value)}
+            placeholder={placeholders?.email || "Nhập email"}
+            className="w-full px-4 py-2 rounded-lg border outline-none focus:ring-2 focus:ring-blue-200"
+          />
+        </Field>
+      </div>
 
-          <Input
-            label="Ngày bắt đầu làm việc"
+      {/* Row 2 */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
+        <Field label="Số điện thoại">
+          <input
+            value={value.phone}
+            onChange={(e) => onChange("phone", e.target.value)}
+            placeholder={placeholders?.phone || "Nhập số điện thoại"}
+            className="w-full px-4 py-2 rounded-lg border outline-none focus:ring-2 focus:ring-blue-200"
+          />
+        </Field>
+
+        <Field label="Ngày vào làm">
+          <input
             type="date"
+            value={value.hiredDate}
+            onChange={(e) => onChange("hiredDate", e.target.value)}
+            className="w-full px-4 py-2 rounded-lg border outline-none focus:ring-2 focus:ring-blue-200"
           />
+          {!value.hiredDate && placeholders?.hiredDate && (
+            <div className="mt-1 text-xs text-gray-500">{placeholders.hiredDate}</div>
+          )}
+        </Field>
 
-          <Select label="Phòng ban *">
-            <option>Chọn phòng ban</option>
-          </Select>
+        <Field label="Trạng thái">
+          <select
+            value={String(value.status || "ACTIVE").toUpperCase()}
+            onChange={(e) => onChange("status", e.target.value)}
+            className="w-full px-4 py-2 rounded-lg border outline-none focus:ring-2 focus:ring-blue-200 bg-white"
+          >
+            <option value="ACTIVE">Đang làm việc</option>
+            <option value="INACTIVE">Đã nghỉ việc</option>
+          </select>
+        </Field>
+      </div>
+    </div>
+  );
+}
 
-          <Input label="Chức danh *" placeholder="Ví dụ: Lập trình viên Senior" />
-
-          <Select label="Người quản lý trực tiếp">
-            <option>Chọn người quản lý</option>
-          </Select>
-
-          <Select label="Loại hợp đồng">
-            <option>Toàn thời gian</option>
-          </Select>
-        </div>
-      </FormSection>
+function Field({ label, children }) {
+  return (
+    <div className="min-w-0">
+      <div className="text-sm font-medium text-gray-700 mb-1">{label}</div>
+      {children}
     </div>
   );
 }
