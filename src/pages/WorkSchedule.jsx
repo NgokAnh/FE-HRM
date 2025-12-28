@@ -30,8 +30,16 @@ export default function WorkSchedule() {
   // search theo nhân viên (client-side)
   const [keyword, setKeyword] = useState("");
 
+  function getStartOfWeek(date = new Date()) {
+    const d = new Date(date);
+    d.setHours(0, 0, 0, 0);
+    const day = d.getDay(); // CN=0 ... T7=6
+    d.setDate(d.getDate() - day); // lùi về CN
+    return d;
+  }
+
   // week start
-  const [weekStartDate, setWeekStartDate] = useState(new Date(2023, 9, 8));
+  const [weekStartDate, setWeekStartDate] = useState(() => getStartOfWeek(new Date()));
 
   const weekDays = useMemo(() => {
     return Array.from({ length: 7 }, (_, i) => {
@@ -107,6 +115,7 @@ export default function WorkSchedule() {
    * ✅ map schedules -> calendarData kiểu:
    * { "YYYY-MM-DD": [ { id, employee, label, color, ws } ] }
    */
+
   const calendarData = useMemo(() => {
     const map = {};
     for (const ws of schedules) {
@@ -200,22 +209,13 @@ export default function WorkSchedule() {
           </ModeTab>
         </div>
 
-        <div className="flex-1 flex items-center gap-2 bg-gray-100 px-4 py-2 rounded-lg border border-transparent focus-within:ring-2 focus-within:ring-blue-100 transition-all">
-          <span className="material-symbols-outlined text-gray-500">search</span>
-          <input
-            value={keyword}
-            onChange={(e) => setKeyword(e.target.value)}
-            className="bg-transparent outline-none flex-1 text-sm"
-            placeholder="Tìm theo tên / email / SĐT / ID..."
-          />
-        </div>
-
+        {/*         
         <button
           onClick={() => setKeyword("")}
           className="px-4 py-2 rounded-lg bg-gray-100 hover:bg-gray-200 text-sm font-medium"
         >
           Xóa lọc
-        </button>
+        </button> */}
       </div>
 
       {loading && <div className="text-gray-600">Đang tải...</div>}
@@ -259,6 +259,30 @@ export default function WorkSchedule() {
               {weekDays.map((date, i) => {
                 const dateKey = formatDateKey(date);
                 const events = calendarData[dateKey] || [];
+                const getStartMinutes = (ev) => {
+                  const ws = ev.ws;
+                  const raw = ws?.shift?.startTime || ws?.startTime; // "HH:mm" hoặc "HH:mm:ss"
+                  if (!raw) return 9999;
+
+                  const s = String(raw);
+                  const m = s.match(/^(\d{2}):(\d{2})/);
+                  if (!m) return 9999;
+
+                  const hh = Number(m[1]);
+                  const mm = Number(m[2]);
+                  return hh * 60 + mm;
+                };
+
+                const sortedEvents = [...events].sort((a, b) => {
+                  const ta = getStartMinutes(a);
+                  const tb = getStartMinutes(b);
+                  if (ta !== tb) return ta - tb;
+
+                  // tie-break: tên NV (hoặc shiftName) để ổn định
+                  const na = (a.ws?.employee?.fullname || a.employee || "").toLowerCase();
+                  const nb = (b.ws?.employee?.fullname || b.employee || "").toLowerCase();
+                  return na.localeCompare(nb);
+                });
 
                 return (
                   <div
@@ -286,73 +310,97 @@ export default function WorkSchedule() {
                     </div>
                     <div className="space-y-2 max-h-[500px] overflow-auto pr-1">
 
-                      {events.map((ev, idx) => {
+                      {sortedEvents.map((ev, idx) => {
                         const ws = ev.ws;
                         const emp = ws?.employee?.fullname || ws?.employeeName || ev.employee || "—";
                         const shiftName = ws?.shift?.name || ws?.shiftName || "—";
                         const start = normalizeTime(ws?.shift?.startTime || ws?.startTime);
                         const end = normalizeTime(ws?.shift?.endTime || ws?.endTime);
-                        const siteName = ws?.workSite?.name || ws?.workSiteName || "Cơ sở #1"; // tuỳ BE trả
                         const note = ws?.note || ws?.description || ""; // nếu có
 
                         const textColor = pickTextColor(ev.color);
                         return (
                           <div
                             key={ev.id ?? idx}
-                            className="relative rounded-xl border px-3 py-2 shadow-sm pr-12"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              openEditModal(dateKey, ws); // click item để edit luôn (tuỳ bạn)
+                            }}
+                            className="
+      group relative rounded-xl border px-2 py-2 shadow-sm
+      overflow-hidden cursor-pointer
+    "
                             style={{
                               backgroundColor: hexToRgba(ev.color, 0.22),
                               borderColor: hexToRgba(ev.color, 0.5),
                               color: textColor,
                             }}
                           >
-                            {/* ✅ nút X float, không chiếm layout */}
-                            <button
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                handleDeleteInline(ev);
-                              }}
-                              className="absolute right-2 top-2 -translate-y-1
-                 w-5 h-5 rounded-md grid place-items-center
-                 text-[11px] font-black leading-none
-                 bg-black/10 hover:bg-black/20"
-                              title="Xóa lịch"
+                            {/* ✅ floating actions: chỉ hiện khi hover, nằm trong item */}
+                            <div
+                              className="
+        absolute right-1 top-1 z-10 flex gap-1
+        opacity-0 group-hover:opacity-100 transition-opacity
+        pointer-events-none
+      "
                             >
-                              ×
-                            </button>
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  openEditModal(dateKey, ws);
+                                }}
+                                className="
+      pointer-events-auto
+      w-5 h-5 rounded-md grid place-items-center
+      bg-black/10 hover:bg-black/20 backdrop-blur
+    "
+                                title="Sửa"
+                                aria-label="Sửa"
+                              >
 
-                            {/* ✅ content luôn nằm trong vùng an toàn (nhờ pr-12) */}
+                                <span className="material-symbols-outlined text-[16px] leading-none">
+                                  edit
+                                </span>
+                              </button>
+
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleDeleteInline(ev);
+                                }}
+                                className="
+          pointer-events-auto
+          h-5 w-5 rounded-md grid place-items-center
+          text-[11px] font-black leading-none
+          bg-black/10 hover:bg-black/20
+          backdrop-blur
+        "
+                                title="Xóa lịch"
+                              >
+                                ×
+                              </button>
+                            </div>
+
+                            {/* ✅ content */}
                             <div className="min-w-0">
-                              {/* dòng 1 */}
-                              <div className="flex items-center gap-2 min-w-0">
-                                <span
-                                  className="w-2.5 h-2.5 rounded-full border shrink-0"
-                                  style={{ backgroundColor: ev.color, borderColor: hexToRgba(ev.color, 0.9) }}
-                                />
-                                <div className="font-bold text-[12px] truncate min-w-0">{emp}</div>
+                              {/* emp: chỉ emp bold */}
+                              <div className="text-[12px] font-bold leading-snug break-words">
+                                {emp}
                               </div>
 
-                              {/* dòng 2 */}
                               {shiftName ? (
-                                <div className="mt-1 text-[11px] font-semibold opacity-95 truncate">
+                                <div className="mt-0.5 text-[11px] opacity-95 break-words">
                                   {shiftName}
                                 </div>
                               ) : null}
                             </div>
 
                             {/* details */}
-                            <div className="mt-2 space-y-1 text-[11px] leading-snug opacity-95">
-                              {/* giờ */}
+                            <div className="mt-1.5 space-y-1 text-[11px] leading-snug opacity-95">
                               <div className="flex items-center gap-2">
-                                <span className="font-semibold">{start} - {end}</span>
+                                <span className="opacity-90">{start}-{end}</span>
                               </div>
 
-                              {/* worksite 1 hàng riêng */}
-                              <div className="font-semibold truncate">
-                                {siteName || "Chưa gán địa điểm"}
-                              </div>
-
-                              {/* note: nếu muốn giới hạn 2 dòng, dùng line-clamp */}
                               {!!note && (
                                 <div className="flex items-start gap-2">
                                   <span className="opacity-80 shrink-0">📝</span>
@@ -362,6 +410,7 @@ export default function WorkSchedule() {
                             </div>
                           </div>
                         );
+
 
                       })}
 
@@ -410,56 +459,51 @@ export default function WorkSchedule() {
                           const shiftName = ws?.shift?.name || ws?.shiftName || "—";
                           const start = normalizeTime(ws?.shift?.startTime || ws?.startTime);
                           const end = normalizeTime(ws?.shift?.endTime || ws?.endTime);
-                          const siteName = ws?.workSite?.name || ws?.workSiteName || "Cơ sở #1";
 
                           const textColor = pickTextColor(ev.color);
 
                           return (
                             <div
                               key={ev.id ?? idx}
-                              className="relative rounded-lg border px-2.5 py-2 shadow-sm"
+                              className="group relative rounded-lg border px-2.5 py-2 shadow-sm"
                               style={{
                                 backgroundColor: hexToRgba(ev.color, 0.22),
                                 borderColor: hexToRgba(ev.color, 0.5),
                                 color: textColor,
                               }}
                             >
-                              <div className="flex items-start justify-between gap-2">
-                                <div className="min-w-0">
-                                  <div className="text-[11px] font-bold truncate">{shiftName}</div>
-                                  <div className="text-[10.5px] font-semibold opacity-95 mt-0.5">
-                                    {start} - {end}
-                                  </div>
-                                  <div className="text-[10.5px] opacity-90 truncate mt-0.5">
-                                    📍 {siteName}
-                                  </div>
-                                </div>
+                              {/* ✅ floating actions (không ảnh hưởng layout) */}
+                              <div
+                                className="absolute right-1 top-1 z-10 flex flex-col gap-1
+               opacity-0 group-hover:opacity-100 transition-opacity
+               pointer-events-none"
+                              >
 
-                                <div className="flex flex-col gap-1 shrink-0">
-                                  <button
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      openEditModal(dateKey, ws);
-                                    }}
-                                    className="px-2 py-1 rounded-md text-[10px] font-bold bg-black/10 hover:bg-black/20"
-                                    title="Sửa"
-                                  >
-                                    Sửa
-                                  </button>
+                                <button
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleDeleteInline(ev);
+                                  }}
+                                  className="pointer-events-auto
+                 w-4 h-4 rounded-md grid place-items-center
+                 text-[10px] font-bold
+                 bg-black/10 hover:bg-black/20 backdrop-blur"
+                                  title="Xóa"
+                                >
+                                  ×
 
-                                  <button
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      handleDeleteInline(ev);
-                                    }}
-                                    className="px-2 py-1 rounded-md text-[10px] font-bold bg-black/10 hover:bg-black/20"
-                                    title="Xóa"
-                                  >
-                                    Xóa
-                                  </button>
+                                </button>
+                              </div>
+
+                              {/* ✅ content full width, không bị chừa chỗ */}
+                              <div className="min-w-0">
+                                <div className="text-[11px] font-bold truncate">{shiftName}</div>
+                                <div className="text-[10.5px] opacity-95 mt-0.5">
+                                  {start}-{end}
                                 </div>
                               </div>
                             </div>
+
                           );
                         })}
 

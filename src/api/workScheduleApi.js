@@ -122,7 +122,7 @@ export function updateWorkSchedule(id, workSchedule) {
   assertId(id, "id");
   if (!workSchedule) throw new Error("workSchedule is required");
   return fetchJson(`${BASE_URL}/${id}`, {
-    method: "PUT",
+    method: "PATCH",
     body: JSON.stringify(workSchedule),
   });
 }
