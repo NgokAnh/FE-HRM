@@ -1,4 +1,3 @@
-// src/api/workScheduleApi.js
 const BASE_URL = "http://localhost:8080/api/v1/work-schedules";
 
 async function fetchJson(url, options = {}) {
@@ -151,7 +150,7 @@ export async function existsWorkSchedule(employeeId, shiftId, workDate) {
 
   const data = await fetchJson(`${BASE_URL}/exists?${qs}`);
   return !!data;
-
+}
 /**
  * Lấy danh sách phân công làm việc của một ca trong khoảng thời gian
  * GET /api/v1/work-schedules/shift/{shiftId}/date-range?startDate=...&endDate=...
