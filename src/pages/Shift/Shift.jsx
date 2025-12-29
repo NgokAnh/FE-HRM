@@ -111,7 +111,7 @@ export default function Shifts() {
               value={keyword}
               onChange={(e) => setKeyword(e.target.value)}
               className="bg-transparent outline-none flex-1"
-              placeholder="Tìm theo tên ca, mô tả, giờ, mã màu, ID..."
+              placeholder="Tìm theo tên ca, ID..."
             />
           </div>
 
