@@ -1,36 +1,16 @@
-const BASE_URL = "http://localhost:8080/api/v1/employees";
+import axiosClient from './axiosClient';
 
-async function fetchJson(url, options = {}) {
-  const res = await fetch(url, {
-    headers: {
-      "Content-Type": "application/json",
-      ...(options.headers || {}),
-    },
-    ...options,
-  });
+const BASE_URL = "/employees";
 
-  if (res.status === 204) return null;
-
-  let body;
-  try {
-    body = await res.json();
-  } catch (e) {
-    console.error("Failed to parse JSON response:", e);
-  }
-
-  if (!res.ok) {
-    const msg = body?.message || body?.error || body?.msg || `Request failed (${res.status})`;
-    const err = new Error(msg);
-    err.status = res.status;
-    err.data = body;
-    throw err;
-  }
-
+// Helper to extract data from response
+const extractData = (response) => {
+  const body = response.data;
   return body && typeof body === "object" && "data" in body ? body.data : body;
-}
+};
 
 export async function getEmployees() {
-  const data = await fetchJson(BASE_URL);
+  const response = await axiosClient.get(BASE_URL);
+  const data = extractData(response);
   if (!Array.isArray(data)) {
     // nếu không phải array, ném lỗi thay vì trả []
     throw new Error("Expected employees array but got: " + typeof data);
@@ -38,31 +18,28 @@ export async function getEmployees() {
   return data;
 }
 
-export function getEmployee(id) {
+export async function getEmployee(id) {
   if (id === undefined || id === null) throw new Error("id is required");
-  return fetchJson(`${BASE_URL}/${id}`);
+  const response = await axiosClient.get(`${BASE_URL}/${id}`);
+  return extractData(response);
 }
 
-export function createEmployee(dto) {
+export async function createEmployee(dto) {
   if (!dto) throw new Error("dto is required");
-  return fetchJson(BASE_URL, {
-    method: "POST",
-    body: JSON.stringify(dto),
-  });
+  const response = await axiosClient.post(BASE_URL, dto);
+  return extractData(response);
 }
 
-export function updateEmployeeBasicInfo(id, employee) {
+export async function updateEmployeeBasicInfo(id, employee) {
   if (id === undefined || id === null) throw new Error("id is required");
   if (!employee) throw new Error("employee is required");
-  return fetchJson(`${BASE_URL}/${id}/basic-info`, {
-    method: "PUT",
-    body: JSON.stringify(employee),
-  });
+  const response = await axiosClient.put(`${BASE_URL}/${id}/basic-info`, employee);
+  return extractData(response);
 }
 
 export async function deleteEmployee(id) {
   if (id === undefined || id === null) throw new Error("id is required");
-  await fetchJson(`${BASE_URL}/${id}`, { method: "DELETE" });
+  await axiosClient.delete(`${BASE_URL}/${id}`);
 }
 
 /**
@@ -71,6 +48,7 @@ export async function deleteEmployee(id) {
  * @returns {Promise<Array>} Danh sách nhân viên active
  */
 export async function getActiveEmployees() {
-  const data = await fetchJson(`${BASE_URL}/active`);
+  const response = await axiosClient.get(`${BASE_URL}/active`);
+  const data = extractData(response);
   return Array.isArray(data) ? data : [];
 }

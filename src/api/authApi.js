@@ -1,4 +1,5 @@
 import { setAuth } from '../utils/auth';
+import axiosClient from './axiosClient';
 
 const BASE_URL = "http://localhost:8080/api/v1/auth";
 
@@ -16,9 +17,12 @@ async function fetchJson(url, options = {}) {
 
     let body;
     try {
-        body = await res.json();
+        const text = await res.text();
+        console.log("🔍 Raw response text:", text.substring(0, 500)); // Log first 500 chars
+        body = JSON.parse(text);
     } catch (e) {
         console.error("Failed to parse JSON response:", e);
+        throw new Error("Invalid JSON response from server");
     }
 
     if (!res.ok) {
@@ -50,17 +54,19 @@ export async function login(credentials) {
 
     console.log("📦 Raw API response:", data);
 
-    // Backend returns "access_token" (snake_case), not "accessToken"
-    const accessToken = data.access_token || data.accessToken;
+    // fetchJson already unwrapped { statusCode, data: {...} } -> {...}
+    // So data here is already the inner data object
+    const accessToken = data?.access_token || data?.accessToken;
+    const user = data?.user;
 
-    if (data.user && accessToken) {
-        console.log("💾 Storing auth data:", { user: data.user, hasToken: !!accessToken });
-        setAuth(data.user, accessToken);
+    if (user && accessToken) {
+        console.log("💾 Storing auth data:", { user, hasToken: !!accessToken });
+        setAuth(user, accessToken);
     } else {
         console.warn("⚠️ Response missing user or access_token:", data);
     }
 
-    return { ...data, accessToken };
+    return { user, accessToken };
 }
 
 /**
@@ -74,11 +80,22 @@ export async function getAccount() {
         throw new Error("No access token found");
     }
 
-    const data = await fetchJson(`${BASE_URL}/account`, {
-        headers: {
-            Authorization: `Bearer ${accessToken}`,
-        },
-    });
+    console.log("📡 Calling /account with token:", accessToken.substring(0, 20) + "...");
+
+    // Use axiosClient so interceptor automatically adds Authorization header
+    const response = await axiosClient.get('/auth/account');
+    const data = response.data?.data || response.data;
+
+    console.log("✅ Account data received:", data);
+
+    // Update user info in localStorage if it changed
+    if (data.user) {
+        const currentUser = localStorage.getItem('user');
+        if (currentUser !== JSON.stringify(data.user)) {
+            localStorage.setItem('user', JSON.stringify(data.user));
+        }
+    }
+
     return data;
 }
 
@@ -90,14 +107,15 @@ export async function getAccount() {
 export async function refreshToken() {
     const data = await fetchJson(`${BASE_URL}/refresh`);
 
-    // Backend returns "access_token" (snake_case)
-    const accessToken = data.access_token || data.accessToken;
+    // fetchJson already unwrapped response
+    const accessToken = data?.access_token || data?.accessToken;
+    const user = data?.user;
 
-    if (data.user && accessToken) {
-        setAuth(data.user, accessToken);
+    if (user && accessToken) {
+        setAuth(user, accessToken);
     }
 
-    return { ...data, accessToken };
+    return { user, accessToken };
 }
 
 /**

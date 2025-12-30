@@ -10,13 +10,20 @@ const axiosClient = axios.create({
   withCredentials: true, // Include cookies for refresh token
 });
 
-// Request interceptor: Attach access token to all requests
+// Request interceptor: Attach access token to all requests (except auth endpoints)
 axiosClient.interceptors.request.use(
   (config) => {
-    const token = getAccessToken();
-    if (token) {
-      config.headers.Authorization = `Bearer ${token}`;
+    // Skip adding token for auth endpoints (login, refresh)
+    const isAuthEndpoint = config.url?.includes('/auth/login') ||
+      config.url?.includes('/auth/refresh');
+
+    if (!isAuthEndpoint) {
+      const token = getAccessToken();
+      if (token) {
+        config.headers.Authorization = `Bearer ${token}`;
+      }
     }
+
     return config;
   },
   (error) => {
@@ -35,12 +42,17 @@ axiosClient.interceptors.response.use(
       originalRequest._retry = true;
 
       try {
-        const newToken = await refreshToken();
+        console.log("🔄 Access token expired, refreshing...");
+        const result = await refreshToken();
+        const newToken = result?.accessToken;
+
         if (newToken) {
+          console.log("✅ Token refreshed successfully");
           originalRequest.headers.Authorization = `Bearer ${newToken}`;
           return axiosClient(originalRequest);
         }
       } catch (refreshError) {
+        console.error("❌ Token refresh failed:", refreshError);
         // Refresh failed, logout user
         logout();
         window.location.href = '/login';
