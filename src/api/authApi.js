@@ -1,4 +1,5 @@
 import { setAuth } from '../utils/auth';
+import axiosClient from './axiosClient';
 
 const BASE_URL = "http://localhost:8080/api/v1/auth";
 
@@ -74,11 +75,22 @@ export async function getAccount() {
         throw new Error("No access token found");
     }
 
-    const data = await fetchJson(`${BASE_URL}/account`, {
-        headers: {
-            Authorization: `Bearer ${accessToken}`,
-        },
-    });
+    console.log("📡 Calling /account with token:", accessToken.substring(0, 20) + "...");
+
+    // Use axiosClient so interceptor automatically adds Authorization header
+    const response = await axiosClient.get('/auth/account');
+    const data = response.data?.data || response.data;
+
+    console.log("✅ Account data received:", data);
+
+    // Update user info in localStorage if it changed
+    if (data.user) {
+        const currentUser = localStorage.getItem('user');
+        if (currentUser !== JSON.stringify(data.user)) {
+            localStorage.setItem('user', JSON.stringify(data.user));
+        }
+    }
+
     return data;
 }
 

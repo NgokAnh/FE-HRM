@@ -1,33 +1,12 @@
-const BASE_URL = "http://localhost:8080/api/attendances";
+import axiosClient from './axiosClient';
 
-async function fetchJson(url, options = {}) {
-    const res = await fetch(url, {
-        headers: {
-            "Content-Type": "application/json",
-            ...(options.headers || {}),
-        },
-        ...options,
-    });
+const BASE_URL = "/attendances";
 
-    if (res.status === 204) return null;
-
-    let body;
-    try {
-        body = await res.json();
-    } catch (e) {
-        console.error("Failed to parse JSON response:", e);
-    }
-
-    if (!res.ok) {
-        const msg = body?.message || body?.error || body?.msg || `Request failed (${res.status})`;
-        const err = new Error(msg);
-        err.status = res.status;
-        err.data = body;
-        throw err;
-    }
-
+// Helper to extract data from response
+const extractData = (response) => {
+    const body = response.data;
     return body && typeof body === "object" && "data" in body ? body.data : body;
-}
+};
 
 /**
  * Lấy thông tin chấm công của một nhân viên cho work schedule cụ thể
@@ -41,11 +20,11 @@ export async function getAttendanceByWorkSchedule(workScheduleId, employeeId) {
     if (!employeeId) throw new Error("employeeId is required");
 
     try {
-        const data = await fetchJson(`${BASE_URL}/my/${workScheduleId}?employeeId=${employeeId}`);
-        return data;
+        const response = await axiosClient.get(`${BASE_URL}/my/${workScheduleId}?employeeId=${employeeId}`);
+        return extractData(response);
     } catch (error) {
         // Nếu chưa có attendance record, API có thể trả 404
-        if (error.status === 404) {
+        if (error.response?.status === 404) {
             return null;
         }
         throw error;

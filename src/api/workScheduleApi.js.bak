@@ -1,31 +1,24 @@
-﻿import axiosClient from './axiosClient';
+import axiosClient from './axiosClient';
 
 const BASE_URL = "/work-schedules";
 
-// Helper to extract data from response
-const extractData = (response) => {
-  const body = response.data;
-  return body && typeof body === "object" && "data" in body ? body.data : body;
-};
-
 function assertId(id, name = "id") {
   if (id === undefined || id === null || id === "") {
-    throw new Error(\\ is required\);
+    throw new Error(`${name} is required`);
   }
 }
 
 function assertDate(dateStr, name = "date") {
-  if (!dateStr) throw new Error(\\ is required\);
+  if (!dateStr) throw new Error(`${name} is required`);
   // basic check YYYY-MM-DD
-  if (!/^\d{4}-\d{2}-\d{2}\$/.test(String(dateStr))) {
-    throw new Error(\\ must be YYYY-MM-DD\);
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(String(dateStr))) {
+    throw new Error(`${name} must be YYYY-MM-DD`);
   }
 }
 
 /** GET /api/v1/work-schedules */
 export async function getWorkSchedules() {
-  const response = await axiosClient.get(BASE_URL);
-  const data = extractData(response);
+  const data = await fetchJson(BASE_URL);
   if (!Array.isArray(data)) {
     throw new Error("Expected work schedules array but got: " + typeof data);
   }
@@ -33,17 +26,15 @@ export async function getWorkSchedules() {
 }
 
 /** GET /api/v1/work-schedules/{id} */
-export async function getWorkSchedule(id) {
+export function getWorkSchedule(id) {
   assertId(id, "id");
-  const response = await axiosClient.get(\\/\\);
-  return extractData(response);
+  return fetchJson(`${BASE_URL}/${id}`);
 }
 
 /** GET /api/v1/work-schedules/employee/{employeeId} */
 export async function getWorkSchedulesByEmployee(employeeId) {
   assertId(employeeId, "employeeId");
-  const response = await axiosClient.get(\\/employee/\\);
-  const data = extractData(response);
+  const data = await fetchJson(`${BASE_URL}/employee/${employeeId}`);
   if (!Array.isArray(data)) throw new Error("Expected array but got: " + typeof data);
   return data;
 }
@@ -51,8 +42,7 @@ export async function getWorkSchedulesByEmployee(employeeId) {
 /** GET /api/v1/work-schedules/shift/{shiftId} */
 export async function getWorkSchedulesByShift(shiftId) {
   assertId(shiftId, "shiftId");
-  const response = await axiosClient.get(\\/shift/\\);
-  const data = extractData(response);
+  const data = await fetchJson(`${BASE_URL}/shift/${shiftId}`);
   if (!Array.isArray(data)) throw new Error("Expected array but got: " + typeof data);
   return data;
 }
@@ -60,8 +50,7 @@ export async function getWorkSchedulesByShift(shiftId) {
 /** GET /api/v1/work-schedules/date/{workDate} */
 export async function getWorkSchedulesByDate(workDate) {
   assertDate(workDate, "workDate");
-  const response = await axiosClient.get(\\/date/\\);
-  const data = extractData(response);
+  const data = await fetchJson(`${BASE_URL}/date/${workDate}`);
   if (!Array.isArray(data)) throw new Error("Expected array but got: " + typeof data);
   return data;
 }
@@ -70,8 +59,7 @@ export async function getWorkSchedulesByDate(workDate) {
 export async function getWorkSchedulesByEmployeeAndDate(employeeId, workDate) {
   assertId(employeeId, "employeeId");
   assertDate(workDate, "workDate");
-  const response = await axiosClient.get(\\/employee/\/date/\\);
-  const data = extractData(response);
+  const data = await fetchJson(`${BASE_URL}/employee/${employeeId}/date/${workDate}`);
   if (!Array.isArray(data)) throw new Error("Expected array but got: " + typeof data);
   return data;
 }
@@ -80,34 +68,37 @@ export async function getWorkSchedulesByEmployeeAndDate(employeeId, workDate) {
  * GET /api/v1/work-schedules/employee/{employeeId}/date-range?startDate=...&endDate=...
  * trả về ResEmpListWorkSchedule (object)
  */
-export async function getWorkSchedulesByEmployeeDateRange(employeeId, startDate, endDate) {
+export function getWorkSchedulesByEmployeeDateRange(employeeId, startDate, endDate) {
   assertId(employeeId, "employeeId");
   assertDate(startDate, "startDate");
   assertDate(endDate, "endDate");
   const qs = new URLSearchParams({ startDate, endDate }).toString();
-  const response = await axiosClient.get(\\/employee/\/date-range?\\);
-  return extractData(response);
+  return fetchJson(`${BASE_URL}/employee/${employeeId}/date-range?${qs}`);
 }
 
 /** POST /api/v1/work-schedules  (body: WorkSchedule) */
-export async function createWorkSchedule(workSchedule) {
+export function createWorkSchedule(workSchedule) {
   if (!workSchedule) throw new Error("workSchedule is required");
-  const response = await axiosClient.post(BASE_URL, workSchedule);
-  return extractData(response);
+  return fetchJson(BASE_URL, {
+    method: "POST",
+    body: JSON.stringify(workSchedule),
+  });
 }
 
 /** PUT /api/v1/work-schedules/{id} (body: WorkSchedule) */
-export async function updateWorkSchedule(id, workSchedule) {
+export function updateWorkSchedule(id, workSchedule) {
   assertId(id, "id");
   if (!workSchedule) throw new Error("workSchedule is required");
-  const response = await axiosClient.patch(\\/\\, workSchedule);
-  return extractData(response);
+  return fetchJson(`${BASE_URL}/${id}`, {
+    method: "PATCH",
+    body: JSON.stringify(workSchedule),
+  });
 }
 
 /** DELETE /api/v1/work-schedules/{id} */
 export async function deleteWorkSchedule(id) {
   assertId(id, "id");
-  await axiosClient.delete(\\/\\);
+  await fetchJson(`${BASE_URL}/${id}`, { method: "DELETE" });
 }
 
 /**
@@ -125,11 +116,9 @@ export async function existsWorkSchedule(employeeId, shiftId, workDate) {
     workDate: String(workDate),
   }).toString();
 
-  const response = await axiosClient.get(\\/exists?\\);
-  const data = extractData(response);
+  const data = await fetchJson(`${BASE_URL}/exists?${qs}`);
   return !!data;
 }
-
 /**
  * Lấy danh sách phân công làm việc của một ca trong khoảng thời gian
  * GET /api/v1/work-schedules/shift/{shiftId}/date-range?startDate=...&endDate=...
@@ -143,12 +132,11 @@ export async function getWorkSchedulesByShiftAndDateRange(shiftId, startDate, en
   if (!startDate) throw new Error("startDate is required");
   if (!endDate) throw new Error("endDate is required");
 
-  const response = await axiosClient.get(
-    \\/shift/\/date-range?startDate=\&endDate=\\
+  const data = await fetchJson(
+    `${BASE_URL}/shift/${shiftId}/date-range?startDate=${startDate}&endDate=${endDate}`
   );
-  return extractData(response);
+  return data;
 }
-
 /**
  * Lấy danh sách phân công làm việc của một nhân viên trong khoảng thời gian
  * GET /api/v1/work-schedules/employee/{employeeId}/date-range?startDate=...&endDate=...
@@ -162,8 +150,8 @@ export async function getWorkSchedulesByEmployeeAndDateRange(employeeId, startDa
   if (!startDate) throw new Error("startDate is required");
   if (!endDate) throw new Error("endDate is required");
 
-  const response = await axiosClient.get(
-    \\/employee/\/date-range?startDate=\&endDate=\\
+  const data = await fetchJson(
+    `${BASE_URL}/employee/${employeeId}/date-range?startDate=${startDate}&endDate=${endDate}`
   );
-  return extractData(response);
+  return data;
 }
