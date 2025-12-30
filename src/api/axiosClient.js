@@ -14,16 +14,16 @@ const axiosClient = axios.create({
 axiosClient.interceptors.request.use(
   (config) => {
     // Skip adding token for auth endpoints (login, refresh)
-    const isAuthEndpoint = config.url?.includes('/auth/login') || 
-                          config.url?.includes('/auth/refresh');
-    
+    const isAuthEndpoint = config.url?.includes('/auth/login') ||
+      config.url?.includes('/auth/refresh');
+
     if (!isAuthEndpoint) {
       const token = getAccessToken();
       if (token) {
         config.headers.Authorization = `Bearer ${token}`;
       }
     }
-    
+
     return config;
   },
   (error) => {
