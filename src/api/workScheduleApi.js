@@ -160,12 +160,30 @@ export async function existsWorkSchedule(employeeId, shiftId, workDate) {
  * @returns {Promise<Object>} ResShiftListWorkSchedule
  */
 export async function getWorkSchedulesByShiftAndDateRange(shiftId, startDate, endDate) {
-    if (!shiftId) throw new Error("shiftId is required");
-    if (!startDate) throw new Error("startDate is required");
-    if (!endDate) throw new Error("endDate is required");
+  if (!shiftId) throw new Error("shiftId is required");
+  if (!startDate) throw new Error("startDate is required");
+  if (!endDate) throw new Error("endDate is required");
 
-    const data = await fetchJson(
-        `${BASE_URL}/shift/${shiftId}/date-range?startDate=${startDate}&endDate=${endDate}`
-    );
-    return data;
+  const data = await fetchJson(
+    `${BASE_URL}/shift/${shiftId}/date-range?startDate=${startDate}&endDate=${endDate}`
+  );
+  return data;
+}
+/**
+ * Lấy danh sách phân công làm việc của một nhân viên trong khoảng thời gian
+ * GET /api/v1/work-schedules/employee/{employeeId}/date-range?startDate=...&endDate=...
+ * @param {number} employeeId - ID của nhân viên
+ * @param {string} startDate - Ngày bắt đầu (YYYY-MM-DD)
+ * @param {string} endDate - Ngày kết thúc (YYYY-MM-DD)
+ * @returns {Promise<Object>} ResEmpListWorkSchedule
+ */
+export async function getWorkSchedulesByEmployeeAndDateRange(employeeId, startDate, endDate) {
+  if (!employeeId) throw new Error("employeeId is required");
+  if (!startDate) throw new Error("startDate is required");
+  if (!endDate) throw new Error("endDate is required");
+
+  const data = await fetchJson(
+    `${BASE_URL}/employee/${employeeId}/date-range?startDate=${startDate}&endDate=${endDate}`
+  );
+  return data;
 }

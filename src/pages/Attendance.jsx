@@ -1,8 +1,9 @@
 import { useState, useEffect } from "react";
 import AttendanceSetting from "./AttendanceSetting";
 import { getActiveShifts } from "../api/shiftApi";
-import { getWorkSchedulesByDate, getWorkSchedulesByShiftAndDateRange } from "../api/workScheduleApi";
+import { getWorkSchedulesByDate, getWorkSchedulesByShiftAndDateRange, getWorkSchedulesByEmployeeAndDateRange } from "../api/workScheduleApi";
 import { getAttendanceByWorkSchedule } from "../api/attendanceApi";
+import { getActiveEmployees } from "../api/employeeApi";
 
 /* ================= MOCK DATA ================= */
 
@@ -106,6 +107,27 @@ function getWeekInfo(date) {
   };
 }
 
+// Helper functions for month calculation
+function getMonthRange(year, month) {
+  // month is 0-indexed (0 = January, 11 = December)
+  const firstDay = new Date(year, month, 1);
+  const lastDay = new Date(year, month + 1, 0);
+  return {
+    startDate: firstDay.toISOString().split('T')[0],
+    endDate: lastDay.toISOString().split('T')[0],
+    month: month + 1,
+    year
+  };
+}
+
+function getMonthInfo(dateString) {
+  const d = new Date(dateString);
+  return {
+    month: d.getMonth() + 1,
+    year: d.getFullYear()
+  };
+}
+
 export default function Attendance() {
   const [view, setView] = useState("day"); // day | week | month
   const [weekViewMode, setWeekViewMode] = useState("byEmployee"); // byEmployee | byShift
@@ -117,6 +139,10 @@ export default function Attendance() {
     const today = new Date();
     return getWeekDates(today.toISOString().split('T')[0]);
   });
+  const [selectedMonth, setSelectedMonth] = useState(() => {
+    const today = new Date();
+    return getMonthRange(today.getFullYear(), today.getMonth());
+  });
 
   const navigateWeek = (direction) => {
     const currentMonday = new Date(selectedWeek[0]);
@@ -126,6 +152,17 @@ export default function Attendance() {
 
   const selectWeekByDate = (dateString) => {
     setSelectedWeek(getWeekDates(dateString));
+  };
+
+  const navigateMonth = (direction) => {
+    const currentDate = new Date(selectedMonth.year, selectedMonth.month - 1, 1);
+    currentDate.setMonth(currentDate.getMonth() + direction);
+    setSelectedMonth(getMonthRange(currentDate.getFullYear(), currentDate.getMonth()));
+  };
+
+  const selectMonthByDate = (dateString) => {
+    const d = new Date(dateString);
+    setSelectedMonth(getMonthRange(d.getFullYear(), d.getMonth()));
   };
 
   return (
@@ -195,6 +232,15 @@ export default function Attendance() {
               </div>
             </>
           )}
+
+          {/* Month Picker - chỉ hiện khi view === "month" */}
+          {view === "month" && (
+            <MonthPicker
+              selectedMonth={selectedMonth}
+              onNavigate={navigateMonth}
+              onSelectDate={selectMonthByDate}
+            />
+          )}
         </div>
 
         <div className="flex gap-4">
@@ -215,9 +261,9 @@ export default function Attendance() {
 
       {/* TABLE */}
       {view === "day" && <DailyAttendanceTable selectedDate={selectedDate} />}
-      {view === "week" && weekViewMode === "byEmployee" && <SummaryAttendanceTable data={summaryData} />}
+      {view === "week" && weekViewMode === "byEmployee" && <SummaryAttendanceTable selectedWeek={selectedWeek} />}
       {view === "week" && weekViewMode === "byShift" && <WeekByShiftTable selectedWeek={selectedWeek} />}
-      {view === "month" && <SummaryAttendanceTable data={summaryData} />}
+      {view === "month" && <MonthAttendanceTable selectedMonth={selectedMonth} />}
 
       {/* PAGINATION */}
       <div className="flex items-center justify-between p-4 text-sm text-gray-600 bg-white border rounded-xl">
@@ -232,6 +278,59 @@ export default function Attendance() {
 }
 
 /* ================= TABLES ================= */
+
+function MonthPicker({ selectedMonth, onNavigate, onSelectDate }) {
+  const [showCalendar, setShowCalendar] = useState(false);
+  const today = new Date().toISOString().split('T')[0];
+
+  const monthNames = ["Tháng 1", "Tháng 2", "Tháng 3", "Tháng 4", "Tháng 5", "Tháng 6",
+    "Tháng 7", "Tháng 8", "Tháng 9", "Tháng 10", "Tháng 11", "Tháng 12"];
+
+  return (
+    <div className="relative flex items-center gap-2 bg-gray-100 px-4 py-2 rounded-lg border">
+      <button
+        onClick={() => onNavigate(-1)}
+        className="hover:bg-gray-200 rounded p-1"
+      >
+        <span className="material-symbols-outlined text-[18px]">chevron_left</span>
+      </button>
+
+      <button
+        onClick={() => setShowCalendar(!showCalendar)}
+        className="text-sm font-medium hover:text-blue-600 px-2 min-w-[120px]"
+      >
+        {monthNames[selectedMonth.month - 1]} {selectedMonth.year}
+      </button>
+
+      <button
+        onClick={() => onNavigate(1)}
+        className="hover:bg-gray-200 rounded p-1"
+      >
+        <span className="material-symbols-outlined text-[18px]">chevron_right</span>
+      </button>
+
+      {showCalendar && (
+        <>
+          <div
+            className="fixed inset-0 z-10"
+            onClick={() => setShowCalendar(false)}
+          />
+          <div className="absolute top-full left-0 mt-2 bg-white border rounded-lg shadow-lg p-4 z-20">
+            <input
+              type="month"
+              value={`${selectedMonth.year}-${String(selectedMonth.month).padStart(2, '0')}`}
+              onChange={(e) => {
+                onSelectDate(e.target.value + '-01');
+                setShowCalendar(false);
+              }}
+              className="border rounded px-3 py-2 text-sm"
+            />
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
 
 function WeekPicker({ selectedWeek, onNavigate, onSelectDate }) {
   const [showCalendar, setShowCalendar] = useState(false);
@@ -658,7 +757,190 @@ function DailyAttendanceTable({ selectedDate }) {
   );
 }
 
-function SummaryAttendanceTable({ data }) {
+function SummaryAttendanceTable({ selectedWeek }) {
+  const [employees, setEmployees] = useState([]);
+  const [employeeStats, setEmployeeStats] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+
+  useEffect(() => {
+    async function fetchData() {
+      setLoading(true);
+      setError(null);
+      try {
+        // 1. Fetch active employees
+        const employeesData = await getActiveEmployees();
+        setEmployees(employeesData);
+
+        const startDate = selectedWeek[0];
+        const endDate = selectedWeek[6];
+        const now = new Date();
+
+        console.log('📅 Fetching data for week:', { startDate, endDate, employeeCount: employeesData.length });
+
+        // 2. Fetch work schedules and calculate stats for each employee
+        const stats = await Promise.all(
+          employeesData.map(async (emp) => {
+            try {
+              const scheduleData = await getWorkSchedulesByEmployeeAndDateRange(
+                emp.id,
+                startDate,
+                endDate
+              );
+
+              console.log(`👤 Employee ${emp.fullname} (${emp.id}):`, {
+                hasData: !!scheduleData,
+                dailySchedulesCount: scheduleData?.dailySchedules?.length || 0,
+                scheduleData
+              });
+
+              // Nếu không có dữ liệu
+              if (!scheduleData || !scheduleData.dailySchedules || scheduleData.dailySchedules.length === 0) {
+                return {
+                  employee: emp,
+                  noData: true,
+                  workShifts: { count: 0, hours: "0h" },
+                  offShifts: { count: 0, hours: "0h" },
+                  late: { count: 0, hours: "-" },
+                  early: { count: 0, hours: "-" },
+                  overtime: { count: 0, hours: "0h" }
+                };
+              }
+
+              // Fetch attendance cho tất cả work schedules
+              const allSchedules = scheduleData.dailySchedules.flatMap(ds => ds.workSchedules);
+
+              let workedCount = 0;
+              let workedHours = 0;
+              let absentCount = 0;
+              let lateCount = 0;
+              let lateMinutes = 0;
+              let earlyCount = 0;
+              let earlyMinutes = 0;
+              let overtimeCount = 0;
+              let overtimeMinutes = 0;
+
+              for (const schedule of allSchedules) {
+                try {
+                  const attendance = await getAttendanceByWorkSchedule(
+                    schedule.id,
+                    emp.id
+                  );
+
+                  if (attendance && attendance.checkIn) {
+                    // Có chấm công
+                    workedCount++;
+                    workedHours += schedule.shift.standardHours || 0;
+
+                    // Tính late/early/overtime từ attendance
+                    if (attendance.lateTime > 0) {
+                      lateCount++;
+                      lateMinutes += attendance.lateTime;
+                    }
+
+                    // Early leave check
+                    if (attendance.earlyLeaveTime && attendance.earlyLeaveTime > 0) {
+                      earlyCount++;
+                      earlyMinutes += attendance.earlyLeaveTime;
+                    }
+
+                    if (attendance.overtime > 0) {
+                      overtimeCount++;
+                      overtimeMinutes += attendance.overtime;
+                    }
+                  } else {
+                    // Không có chấm công - kiểm tra đã qua thời gian làm việc chưa
+                    const workDateTime = new Date(`${schedule.workDate}T${schedule.shift.endTime}`);
+                    if (now > workDateTime) {
+                      absentCount++;
+                    }
+                  }
+                } catch (err) {
+                  // Không có attendance record
+                  const workDateTime = new Date(`${schedule.workDate}T${schedule.shift.endTime}`);
+                  if (now > workDateTime) {
+                    absentCount++;
+                  }
+                }
+              }
+
+              const formatMinutesToHours = (minutes) => {
+                if (minutes === 0) return "0h";
+                const hours = Math.floor(minutes / 60);
+                const mins = minutes % 60;
+                if (mins === 0) return `${hours}h`;
+                return `${hours}h ${mins}m`;
+              };
+
+              return {
+                employee: emp,
+                noData: false,
+                workShifts: {
+                  count: workedCount,
+                  hours: workedHours > 0 ? `${workedHours.toFixed(0)}h` : "0h"
+                },
+                offShifts: {
+                  count: absentCount,
+                  hours: "0h"
+                },
+                late: {
+                  count: lateCount,
+                  hours: formatMinutesToHours(lateMinutes)
+                },
+                early: {
+                  count: earlyCount,
+                  hours: formatMinutesToHours(earlyMinutes)
+                },
+                overtime: {
+                  count: overtimeCount,
+                  hours: formatMinutesToHours(overtimeMinutes)
+                }
+              };
+            } catch (err) {
+              console.error(`Error fetching data for employee ${emp.id}:`, err);
+              return {
+                employee: emp,
+                noData: true,
+                workShifts: { count: 0, hours: "0h" },
+                offShifts: { count: 0, hours: "0h" },
+                late: { count: 0, hours: "-" },
+                early: { count: 0, hours: "-" },
+                overtime: { count: 0, hours: "0h" }
+              };
+            }
+          })
+        );
+
+        setEmployeeStats(stats);
+      } catch (err) {
+        console.error("Error fetching employee summary data:", err);
+        setError(err.message);
+      } finally {
+        setLoading(false);
+      }
+    }
+
+    if (selectedWeek && selectedWeek.length === 7) {
+      fetchData();
+    }
+  }, [selectedWeek]);
+
+  if (loading) {
+    return (
+      <div className="bg-white rounded-xl border p-8 text-center">
+        <div className="text-gray-500">Đang tải dữ liệu...</div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="bg-white rounded-xl border p-8 text-center">
+        <div className="text-red-500">Lỗi: {error}</div>
+      </div>
+    );
+  }
+
   return (
     <div className="bg-white rounded-xl border overflow-hidden">
       <table className="w-full text-sm">
@@ -667,23 +949,265 @@ function SummaryAttendanceTable({ data }) {
             <th className="p-4 text-left">Nhân viên</th>
             <th className="p-4 text-center">Đi làm</th>
             <th className="p-4 text-center">Nghỉ làm</th>
-            <th className="p-4 text-center">Đi muộn</th>
-            <th className="p-4 text-center">Về sớm</th>
+            <th className="p-4 text-center">Đi muộn / Về sớm</th>
             <th className="p-4 text-center">Làm thêm</th>
           </tr>
         </thead>
 
         <tbody>
-          {data.map((emp, i) => (
-            <tr key={i} className="border-t">
-              <td className="p-4 font-medium">{emp.name}</td>
-              <SummaryCell {...emp.workDays} />
-              <SummaryCell {...emp.offDays} />
-              <SummaryCell {...emp.late} />
-              <SummaryCell {...emp.early} />
-              <SummaryCell {...emp.overtime} highlight />
-            </tr>
-          ))}
+          {employeeStats.map((stat, i) => {
+            if (stat.noData) {
+              return (
+                <tr key={i} className="border-t">
+                  <td className="p-4 font-medium">{stat.employee.fullname}</td>
+                  <td colSpan="4" className="p-4 text-center text-gray-400 italic">
+                    Nhân viên chưa có dữ liệu chấm công
+                  </td>
+                </tr>
+              );
+            }
+
+            return (
+              <tr key={i} className="border-t">
+                <td className="p-4 font-medium">{stat.employee.fullname}</td>
+                <SummaryCell days={stat.workShifts.count} hours={stat.workShifts.hours} />
+                <SummaryCell days={stat.offShifts.count} hours={stat.offShifts.hours} />
+                <SummaryCellCombined
+                  late={{ days: stat.late.count, hours: stat.late.hours }}
+                  early={{ days: stat.early.count, hours: stat.early.hours }}
+                />
+                <SummaryCell days={stat.overtime.count} hours={stat.overtime.hours} highlight />
+              </tr>
+            );
+          })}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+function MonthAttendanceTable({ selectedMonth }) {
+  const [employees, setEmployees] = useState([]);
+  const [employeeStats, setEmployeeStats] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+
+  useEffect(() => {
+    async function fetchData() {
+      setLoading(true);
+      setError(null);
+      try {
+        // 1. Fetch active employees
+        const employeesData = await getActiveEmployees();
+        setEmployees(employeesData);
+
+        const startDate = selectedMonth.startDate;
+        const endDate = selectedMonth.endDate;
+        const now = new Date();
+
+        console.log('📅 Fetching month data:', { startDate, endDate, employeeCount: employeesData.length });
+
+        // 2. Fetch work schedules and calculate stats for each employee
+        const stats = await Promise.all(
+          employeesData.map(async (emp) => {
+            try {
+              const scheduleData = await getWorkSchedulesByEmployeeAndDateRange(
+                emp.id,
+                startDate,
+                endDate
+              );
+
+              console.log(`👤 Employee ${emp.fullname} (${emp.id}):`, {
+                hasData: !!scheduleData,
+                dailySchedulesCount: scheduleData?.dailySchedules?.length || 0
+              });
+
+              // Nếu không có dữ liệu
+              if (!scheduleData || !scheduleData.dailySchedules || scheduleData.dailySchedules.length === 0) {
+                return {
+                  employee: emp,
+                  noData: true,
+                  workShifts: { count: 0, hours: "0h" },
+                  offShifts: { count: 0, hours: "0h" },
+                  late: { count: 0, hours: "-" },
+                  early: { count: 0, hours: "-" },
+                  overtime: { count: 0, hours: "0h" }
+                };
+              }
+
+              // Fetch attendance cho tất cả work schedules
+              const allSchedules = scheduleData.dailySchedules.flatMap(ds => ds.workSchedules);
+
+              let workedCount = 0;
+              let workedHours = 0;
+              let absentCount = 0;
+              let lateCount = 0;
+              let lateMinutes = 0;
+              let earlyCount = 0;
+              let earlyMinutes = 0;
+              let overtimeCount = 0;
+              let overtimeMinutes = 0;
+
+              for (const schedule of allSchedules) {
+                try {
+                  const attendance = await getAttendanceByWorkSchedule(
+                    schedule.id,
+                    emp.id
+                  );
+
+                  if (attendance && attendance.checkIn) {
+                    // Có chấm công
+                    workedCount++;
+                    workedHours += schedule.shift.standardHours || 0;
+
+                    // Tính late/early/overtime từ attendance
+                    if (attendance.lateTime > 0) {
+                      lateCount++;
+                      lateMinutes += attendance.lateTime;
+                    }
+
+                    // Early leave check
+                    if (attendance.earlyLeaveTime && attendance.earlyLeaveTime > 0) {
+                      earlyCount++;
+                      earlyMinutes += attendance.earlyLeaveTime;
+                    }
+
+                    if (attendance.overtime > 0) {
+                      overtimeCount++;
+                      overtimeMinutes += attendance.overtime;
+                    }
+                  } else {
+                    // Không có chấm công - kiểm tra đã qua thời gian làm việc chưa
+                    const workDateTime = new Date(`${schedule.workDate}T${schedule.shift.endTime}`);
+                    if (now > workDateTime) {
+                      absentCount++;
+                    }
+                  }
+                } catch (err) {
+                  // Không có attendance record
+                  const workDateTime = new Date(`${schedule.workDate}T${schedule.shift.endTime}`);
+                  if (now > workDateTime) {
+                    absentCount++;
+                  }
+                }
+              }
+
+              const formatMinutesToHours = (minutes) => {
+                if (minutes === 0) return "0h";
+                const hours = Math.floor(minutes / 60);
+                const mins = minutes % 60;
+                if (mins === 0) return `${hours}h`;
+                return `${hours}h ${mins}m`;
+              };
+
+              return {
+                employee: emp,
+                noData: false,
+                workShifts: {
+                  count: workedCount,
+                  hours: workedHours > 0 ? `${workedHours.toFixed(0)}h` : "0h"
+                },
+                offShifts: {
+                  count: absentCount,
+                  hours: "0h"
+                },
+                late: {
+                  count: lateCount,
+                  hours: formatMinutesToHours(lateMinutes)
+                },
+                early: {
+                  count: earlyCount,
+                  hours: formatMinutesToHours(earlyMinutes)
+                },
+                overtime: {
+                  count: overtimeCount,
+                  hours: formatMinutesToHours(overtimeMinutes)
+                }
+              };
+            } catch (err) {
+              console.error(`Error fetching data for employee ${emp.id}:`, err);
+              return {
+                employee: emp,
+                noData: true,
+                workShifts: { count: 0, hours: "0h" },
+                offShifts: { count: 0, hours: "0h" },
+                late: { count: 0, hours: "-" },
+                early: { count: 0, hours: "-" },
+                overtime: { count: 0, hours: "0h" }
+              };
+            }
+          })
+        );
+
+        setEmployeeStats(stats);
+      } catch (err) {
+        console.error("Error fetching month attendance data:", err);
+        setError(err.message);
+      } finally {
+        setLoading(false);
+      }
+    }
+
+    if (selectedMonth && selectedMonth.startDate && selectedMonth.endDate) {
+      fetchData();
+    }
+  }, [selectedMonth]);
+
+  if (loading) {
+    return (
+      <div className="bg-white rounded-xl border p-8 text-center">
+        <div className="text-gray-500">Đang tải dữ liệu...</div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="bg-white rounded-xl border p-8 text-center">
+        <div className="text-red-500">Lỗi: {error}</div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="bg-white rounded-xl border overflow-hidden">
+      <table className="w-full text-sm">
+        <thead className="bg-gray-50">
+          <tr>
+            <th className="p-4 text-left">Nhân viên</th>
+            <th className="p-4 text-center">Đi làm</th>
+            <th className="p-4 text-center">Nghỉ làm</th>
+            <th className="p-4 text-center">Đi muộn / Về sớm</th>
+            <th className="p-4 text-center">Làm thêm</th>
+          </tr>
+        </thead>
+
+        <tbody>
+          {employeeStats.map((stat, i) => {
+            if (stat.noData) {
+              return (
+                <tr key={i} className="border-t">
+                  <td className="p-4 font-medium">{stat.employee.fullname}</td>
+                  <td colSpan="4" className="p-4 text-center text-gray-400 italic">
+                    Nhân viên chưa có dữ liệu chấm công
+                  </td>
+                </tr>
+              );
+            }
+
+            return (
+              <tr key={i} className="border-t">
+                <td className="p-4 font-medium">{stat.employee.fullname}</td>
+                <SummaryCell days={stat.workShifts.count} hours={stat.workShifts.hours} />
+                <SummaryCell days={stat.offShifts.count} hours={stat.offShifts.hours} />
+                <SummaryCellCombined
+                  late={{ days: stat.late.count, hours: stat.late.hours }}
+                  early={{ days: stat.early.count, hours: stat.early.hours }}
+                />
+                <SummaryCell days={stat.overtime.count} hours={stat.overtime.hours} highlight />
+              </tr>
+            );
+          })}
         </tbody>
       </table>
     </div>
@@ -694,9 +1218,27 @@ function SummaryCell({ days, hours, highlight }) {
   return (
     <td className="p-4 text-center">
       <div className={`font-medium ${highlight ? "text-blue-600" : ""}`}>
-        {days} ngày
+        {days} ca
       </div>
       <div className="text-xs text-gray-500">{hours}</div>
+    </td>
+  );
+}
+
+function SummaryCellCombined({ late, early }) {
+  return (
+    <td className="p-4 text-center">
+      <div className="space-y-1">
+        <div className="text-xs text-gray-600">
+          <span className="font-medium">{late.days}</span> ca trễ
+        </div>
+        <div className="text-xs text-gray-600">
+          <span className="font-medium">{early.days}</span> ca sớm
+        </div>
+      </div>
+      <div className="text-xs text-gray-500 mt-1">
+        {late.hours} / {early.hours}
+      </div>
     </td>
   );
 }

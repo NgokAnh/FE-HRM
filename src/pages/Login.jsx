@@ -1,8 +1,36 @@
 import { useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
+import { login as apiLogin } from "../api/authApi";
 
 export default function Login() {
   const [showPassword, setShowPassword] = useState(false);
+  const [username, setUsername] = useState("");
+  const [password, setPassword] = useState("");
+  const [error, setError] = useState("");
+  const [loading, setLoading] = useState(false);
+  const navigate = useNavigate();
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setError("");
+    setLoading(true);
+
+    try {
+      console.log("🔐 Attempting login with:", { username });
+      const response = await apiLogin({ username, password });
+      console.log("✅ Login response:", response);
+
+      // apiLogin already calls setAuth internally
+      // Redirect to admin dashboard
+      console.log("🚀 Navigating to /admin");
+      navigate("/admin", { replace: true });
+    } catch (err) {
+      console.error("❌ Login error:", err);
+      setError(err.message || "Đăng nhập thất bại. Vui lòng kiểm tra lại thông tin.");
+    } finally {
+      setLoading(false);
+    }
+  };
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-50">
@@ -23,17 +51,27 @@ export default function Login() {
           Đăng nhập để tiếp tục quản lý công việc.
         </p>
 
-        {/* FORM */}
-        <div className="space-y-4">
-          <div>
-            <label className="text-sm font-medium">
-              Email hoặc Tên đăng nhập
-            </label>
-            <input
-              className="w-full mt-1 px-4 py-2.5 rounded-lg border"
-              placeholder="user@company.com"
-            />
+        {/* ERROR MESSAGE */}
+        {error && (
+          <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg text-red-600 text-sm">
+            {error}
           </div>
+        )}
+
+        {/* FORM */}
+        <form onSubmit={handleSubmit} className="space-y-4">\n          <div>
+          <label className="text-sm font-medium">
+            Email hoặc Tên đăng nhập
+          </label>
+          <input
+            className="w-full mt-1 px-4 py-2.5 rounded-lg border"
+            placeholder="user@company.com"
+            value={username}
+            onChange={(e) => setUsername(e.target.value)}
+            required
+            disabled={loading}
+          />
+        </div>
 
           <div>
             <label className="text-sm font-medium">Mật khẩu</label>
@@ -41,11 +79,16 @@ export default function Login() {
               <input
                 type={showPassword ? "text" : "password"}
                 className="w-full px-4 py-2.5 pr-10 rounded-lg border"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                required
+                disabled={loading}
               />
               <button
                 type="button"
                 onClick={() => setShowPassword(!showPassword)}
                 className="absolute right-3 top-1/2 -translate-y-1/2"
+                disabled={loading}
               >
                 <span className="material-symbols-outlined">
                   {showPassword ? "visibility_off" : "visibility"}
@@ -54,10 +97,14 @@ export default function Login() {
             </div>
           </div>
 
-          <button className="w-full py-3 rounded-lg bg-blue-600 text-white">
-            Đăng nhập
+          <button
+            type="submit"
+            className="w-full py-3 rounded-lg bg-blue-600 text-white disabled:bg-gray-400 disabled:cursor-not-allowed"
+            disabled={loading}
+          >
+            {loading ? "Đang đăng nhập..." : "Đăng nhập"}
           </button>
-        </div>
+        </form>
 
         {/* FOOTER */}
         <div className="mt-6 pt-4 border-t text-center text-sm text-gray-500">

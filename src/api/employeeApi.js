@@ -64,3 +64,13 @@ export async function deleteEmployee(id) {
   if (id === undefined || id === null) throw new Error("id is required");
   await fetchJson(`${BASE_URL}/${id}`, { method: "DELETE" });
 }
+
+/**
+ * Lấy danh sách nhân viên đang làm (active)
+ * GET /api/v1/employees/active
+ * @returns {Promise<Array>} Danh sách nhân viên active
+ */
+export async function getActiveEmployees() {
+  const data = await fetchJson(`${BASE_URL}/active`);
+  return Array.isArray(data) ? data : [];
+}

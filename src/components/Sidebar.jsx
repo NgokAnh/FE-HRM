@@ -1,4 +1,6 @@
 import { NavLink, useNavigate } from "react-router-dom";
+import { logout as apiLogout } from "../api/authApi";
+import { logout as clearAuth } from "../utils/auth";
 
 const menus = [
   { label: "Dashboard", to: "/admin", icon: "dashboard" },
@@ -13,13 +15,24 @@ const menus = [
 export default function Sidebar() {
   const navigate = useNavigate();
 
-  const handleLogout = () => {
-    // Xóa dữ liệu đăng nhập (fake auth / sau này thay bằng API)
-    localStorage.removeItem("token");
-    localStorage.removeItem("user");
+  // Get user from localStorage
+  const user = JSON.parse(localStorage.getItem("user") || "{}");
+  const userName = user.name || "User";
+  const userEmail = user.email || "user@company.com";
+  const userInitial = userName.charAt(0).toUpperCase();
 
-    // Điều hướng về trang đăng nhập
-    navigate("/login", { replace: true });
+  const handleLogout = async () => {
+    try {
+      // Call logout API to invalidate refresh token
+      await apiLogout();
+    } catch (error) {
+      console.error("Logout API error:", error);
+    } finally {
+      // Clear local auth data regardless of API result
+      clearAuth();
+      // Navigate to login
+      navigate("/login", { replace: true });
+    }
   };
 
   return (
@@ -39,10 +52,9 @@ export default function Sidebar() {
             className={({ isActive }) =>
               `flex items-center gap-3 px-3 py-2.5 rounded-lg
               transition-all duration-200
-              ${
-                isActive
-                  ? "bg-blue-50 text-blue-600"
-                  : "text-gray-600 hover:bg-gray-100 hover:translate-x-1"
+              ${isActive
+                ? "bg-blue-50 text-blue-600"
+                : "text-gray-600 hover:bg-gray-100 hover:translate-x-1"
               }`
             }
           >
@@ -60,15 +72,15 @@ export default function Sidebar() {
       {/* ACCOUNT INFO */}
       <div className="flex items-center gap-3 px-3 py-3 rounded-lg bg-gray-50">
         <div className="w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center text-blue-600 font-semibold">
-          A
+          {userInitial}
         </div>
 
         <div className="flex-1">
           <div className="text-sm font-medium text-gray-800">
-            Admin HR
+            {userName}
           </div>
           <div className="text-xs text-gray-500">
-            admin@company.com
+            {userEmail}
           </div>
         </div>
       </div>
