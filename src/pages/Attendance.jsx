@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import AttendanceSetting from "./AttendanceSetting";
 import { getActiveShifts } from "../api/shiftApi";
-import { getWorkSchedulesByDate, getWorkSchedulesByShiftAndDateRange, getWorkSchedulesByEmployeeAndDateRange } from "../api/workScheduleApi";
+import { getWorkSchedulesByDate, getWorkSchedulesByShiftAndDateRange, getWorkSchedulesByEmployeeAndDateRange, getWeeklySchedulesByShift } from "../api/workScheduleApi";
 import { getAttendanceByWorkSchedule, getWeeklyAttendanceSummary } from "../api/attendanceApi";
 import { getActiveEmployees } from "../api/employeeApi";
 
@@ -397,6 +397,51 @@ function WeekByShiftTable({ selectedWeek }) {
       setLoading(true);
       setError(null);
       try {
+        const startDate = selectedWeek[0];
+        const endDate = selectedWeek[6];
+
+        console.log('📅 [API V2] Fetching weekly shift schedules:', { startDate, endDate });
+
+        // 🆕 USE NEW API V2: Single call instead of 206 calls
+        const data = await getWeeklySchedulesByShift(startDate, endDate);
+
+        console.log('✅ [API V2] Shift schedules received:', {
+          shiftCount: data?.shifts?.length || 0,
+          dateRange: `${data?.startDate} ~ ${data?.endDate}`
+        });
+
+        // Transform API v2 response to match UI format
+        const shiftsData = data.shifts.map(item => item.shift);
+        setShifts(shiftsData);
+
+        // Convert to shiftSchedules map: { [shiftId]: { shift, dailySchedules } }
+        const shiftSchedulesMap = {};
+        data.shifts.forEach(item => {
+          shiftSchedulesMap[item.shift.id] = {
+            shift: item.shift,
+            dailySchedules: item.dailySchedules
+          };
+        });
+        setShiftSchedules(shiftSchedulesMap);
+
+      } catch (err) {
+        console.error("❌ Error fetching weekly shift schedules:", err);
+        setError(err.message);
+      } finally {
+        setLoading(false);
+      }
+    }
+
+    fetchData();
+  }, [selectedWeek]);
+
+  // ============ CODE CŨ (3-tier API - 206 calls) - GIỮ LẠI ĐỂ PHÒNG KHI CẦN ============
+  /*
+  useEffect(() => {
+    async function fetchData() {
+      setLoading(true);
+      setError(null);
+      try {
         // 1. Fetch active shifts
         const shiftsData = await getActiveShifts();
         setShifts(shiftsData);
@@ -451,6 +496,8 @@ function WeekByShiftTable({ selectedWeek }) {
 
     fetchData();
   }, [selectedWeek]);
+  */
+  // ============ END CODE CŨ ============
 
   if (loading) {
     return (
