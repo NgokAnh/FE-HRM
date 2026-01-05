@@ -142,19 +142,19 @@ export async function getWeeklySchedulesByShift(startDate, endDate) {
   if (!endDate) throw new Error("endDate is required");
 
   console.log("📡 [API V2] Calling weekly-by-shift:", { startDate, endDate });
-  
+
   // Override baseURL to use v2 endpoint
   const response = await axiosClient.get(`/v2${BASE_URL}/weekly-by-shift`, {
     baseURL: 'http://localhost:8080/api',
     params: { startDate, endDate }
   });
-  
+
   const data = extractData(response);
   console.log("📦 [API V2] Weekly shift schedules response:", {
     shiftCount: data?.shifts?.length || 0,
     dateRange: `${data?.startDate} ~ ${data?.endDate}`
   });
-  
+
   return data;
 }
 
