@@ -7,27 +7,24 @@ export default function AttendanceSetting() {
 
   return (
     <>
+      {/* Nút hiển thị tọa độ + bán kính nếu đã chọn */}
       <button
         onClick={() => setOpenMap(true)}
         className="flex items-center gap-2 px-4 py-2 rounded-lg bg-blue-600 text-white"
       >
         <span className="material-symbols-outlined">location_on</span>
-        Chọn vị trí
+        {location
+          ? `(${location.lat.toFixed(6)}, ${location.lng.toFixed(6)}) – ${location.radius}m`
+          : "Chọn vị trí"}
       </button>
-
-      {location && (
-        <div className="mt-2 text-sm text-gray-600">
-          📍 {location.lat}, {location.lng} – {location.radius}m
-        </div>
-      )}
 
       <SelectLocationModal
         open={openMap}
         onClose={() => setOpenMap(false)}
         onConfirm={(data) => {
+          // data phải có { lat, lng, radius }
           setLocation(data);
           setOpenMap(false);
-          console.log("Vị trí chấm công:", data);
         }}
       />
     </>

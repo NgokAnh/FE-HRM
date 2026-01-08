@@ -1,134 +1,125 @@
-import { setAuth } from '../utils/auth';
-import axiosClient from './axiosClient';
+import { setAuth } from "../utils/auth";
+import axiosClient from "./axiosClient";
 
 const BASE_URL = "http://localhost:8080/api/v1/auth";
 
+/**
+ * Fetch JSON helper
+ */
 async function fetchJson(url, options = {}) {
-    const res = await fetch(url, {
-        headers: {
-            "Content-Type": "application/json",
-            ...(options.headers || {}),
-        },
-        credentials: 'include', // Important for cookies
-        ...options,
-    });
+  const res = await fetch(url, {
+    headers: {
+      "Content-Type": "application/json",
+      ...(options.headers || {}),
+    },
+    credentials: "include",
+    ...options,
+  });
 
-    if (res.status === 204) return null;
+  if (res.status === 204) return null;
 
-    let body;
-    try {
-        const text = await res.text();
-        console.log("🔍 Raw response text:", text.substring(0, 500)); // Log first 500 chars
-        body = JSON.parse(text);
-    } catch (e) {
-        console.error("Failed to parse JSON response:", e);
-        throw new Error("Invalid JSON response from server");
-    }
+  let body;
+  try {
+    const text = await res.text();
+    body = text ? JSON.parse(text) : null;
+  } catch {
+    throw new Error("Invalid JSON response from server");
+  }
 
-    if (!res.ok) {
-        const msg = body?.message || body?.error || body?.msg || `Request failed (${res.status})`;
-        const err = new Error(msg);
-        err.status = res.status;
-        err.data = body;
-        throw err;
-    }
+  if (!res.ok) {
+    const msg =
+      body?.message ||
+      body?.error ||
+      body?.msg ||
+      `Request failed (${res.status})`;
+    const err = new Error(msg);
+    err.status = res.status;
+    err.data = body;
+    throw err;
+  }
 
-    return body && typeof body === "object" && "data" in body ? body.data : body;
+  // unwrap { data: {...} } nếu backend bọc
+  return body?.data ?? body;
 }
 
 /**
- * Login user
+ * 🔐 LOGIN
  * POST /api/v1/auth/login
- * @param {Object} credentials - { username, password }
- * @returns {Promise<Object>} { user: { id, email, name, role }, accessToken }
+ * @param {Object} credentials { username, password }
+ * @returns {Promise<{user, accessToken}>}
  */
 export async function login(credentials) {
-    if (!credentials.username) throw new Error("username is required");
-    if (!credentials.password) throw new Error("password is required");
+  if (!credentials?.username) throw new Error("username is required");
+  if (!credentials?.password) throw new Error("password is required");
 
-    console.log("📡 Calling login API...");
-    const data = await fetchJson(`${BASE_URL}/login`, {
-        method: "POST",
-        body: JSON.stringify(credentials),
-    });
+  const data = await fetchJson(`${BASE_URL}/login`, {
+    method: "POST",
+    body: JSON.stringify(credentials),
+  });
 
-    console.log("📦 Raw API response:", data);
+  const user = data?.user;
+  const accessToken = data?.access_token;
 
-    // fetchJson already unwrapped { statusCode, data: {...} } -> {...}
-    // So data here is already the inner data object
-    const accessToken = data?.access_token || data?.accessToken;
-    const user = data?.user;
+  if (!user || !accessToken) {
+    throw new Error("Invalid login response");
+  }
 
-    if (user && accessToken) {
-        console.log("💾 Storing auth data:", { user, hasToken: !!accessToken });
-        setAuth(user, accessToken);
-    } else {
-        console.warn("⚠️ Response missing user or access_token:", data);
-    }
+  // ⛔️ QUAN TRỌNG: user.role PHẢI là object { id, name }
+  setAuth(user, accessToken);
 
-    return { user, accessToken };
+  return { user, accessToken };
 }
 
 /**
- * Get current user account info
+ * 👤 GET CURRENT ACCOUNT
  * GET /api/v1/auth/account
- * @returns {Promise<Object>} { user: { id, email, name, role } }
  */
 export async function getAccount() {
-    const accessToken = localStorage.getItem('access_token');
-    if (!accessToken) {
-        throw new Error("No access token found");
-    }
+  const accessToken = localStorage.getItem("access_token");
+  if (!accessToken) throw new Error("No access token");
 
-    console.log("📡 Calling /account with token:", accessToken.substring(0, 20) + "...");
+  const res = await axiosClient.get("/auth/account");
+  const data = res.data?.data ?? res.data;
 
-    // Use axiosClient so interceptor automatically adds Authorization header
-    const response = await axiosClient.get('/auth/account');
-    const data = response.data?.data || response.data;
+  if (data?.user) {
+    localStorage.setItem("user", JSON.stringify(data.user));
+  }
 
-    console.log("✅ Account data received:", data);
-
-    // Update user info in localStorage if it changed
-    if (data.user) {
-        const currentUser = localStorage.getItem('user');
-        if (currentUser !== JSON.stringify(data.user)) {
-            localStorage.setItem('user', JSON.stringify(data.user));
-        }
-    }
-
-    return data;
+  return data;
 }
 
 /**
- * Refresh access token using refresh token (in cookie)
+ * 🔁 REFRESH TOKEN
  * GET /api/v1/auth/refresh
- * @returns {Promise<Object>} { user: { id, email, name, role }, accessToken }
  */
 export async function refreshToken() {
-    const data = await fetchJson(`${BASE_URL}/refresh`);
+  const data = await fetchJson(`${BASE_URL}/refresh`);
 
-    // fetchJson already unwrapped response
-    const accessToken = data?.access_token || data?.accessToken;
-    const user = data?.user;
+  const user = data?.user;
+  const accessToken = data?.access_token;
 
-    if (user && accessToken) {
-        setAuth(user, accessToken);
-    }
+  if (user && accessToken) {
+    setAuth(user, accessToken);
+  }
 
-    return { user, accessToken };
+  return { user, accessToken };
 }
 
 /**
- * Logout user
+ * 🚪 LOGOUT
  * POST /api/v1/auth/logout
  */
 export async function logout() {
-    const accessToken = localStorage.getItem('access_token');
+  const accessToken = localStorage.getItem("access_token");
 
-    await fetchJson(`${BASE_URL}/logout`, {
-        method: "POST",
-        headers: accessToken ? {
-            Authorization: `Bearer ${accessToken}`,
-        } : {},
-    });
+  await fetchJson(`${BASE_URL}/logout`, {
+    method: "POST",
+    headers: accessToken
+      ? { Authorization: `Bearer ${accessToken}` }
+      : {},
+  });
+
+  // clear local
+  localStorage.removeItem("access_token");
+  localStorage.removeItem("user");
 }

@@ -6,7 +6,7 @@ export default function DashboardLayout() {
   return (
     <div className="flex min-h-screen bg-gray-100">
       <Sidebar />
-        <main className="p-8 flex-1">
+  <main className="ml-64 min-h-screen w-[calc(100%-16rem)] p-6">
           <Outlet />
         </main>
       </div>

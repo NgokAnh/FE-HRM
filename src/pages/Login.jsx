@@ -11,26 +11,35 @@ export default function Login() {
   const navigate = useNavigate();
 
   const handleSubmit = async (e) => {
-    e.preventDefault();
-    setError("");
-    setLoading(true);
+  e.preventDefault();
+  setError("");
+  setLoading(true);
 
-    try {
-      console.log("🔐 Attempting login with:", { username });
-      const response = await apiLogin({ username, password });
-      console.log("✅ Login response:", response);
+  try {
+    const { user } = await apiLogin({ username, password });
 
-      // apiLogin already calls setAuth internally
-      // Redirect to admin dashboard
-      console.log("🚀 Navigating to /admin");
-      navigate("/admin", { replace: true });
-    } catch (err) {
-      console.error("❌ Login error:", err);
-      setError(err.message || "Đăng nhập thất bại. Vui lòng kiểm tra lại thông tin.");
-    } finally {
-      setLoading(false);
+    const roleName = user?.role?.name;
+
+    if (!roleName) {
+      throw new Error("Không xác định được quyền người dùng");
     }
-  };
+
+    if (roleName === "ADMIN") {
+      navigate("/admin", { replace: true });
+    } else if (roleName === "EMPLOYEE") {
+      navigate("/employee", { replace: true });
+    } else {
+      throw new Error("Role không hợp lệ");
+    }
+  } catch (err) {
+    console.error("❌ Login error:", err);
+    setError(
+      err.message || "Đăng nhập thất bại. Vui lòng kiểm tra lại thông tin."
+    );
+  } finally {
+    setLoading(false);
+  }
+};
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-50">
@@ -59,7 +68,7 @@ export default function Login() {
         )}
 
         {/* FORM */}
-        <form onSubmit={handleSubmit} className="space-y-4">\n          <div>
+        <form onSubmit={handleSubmit} className="space-y-4">          <div>
           <label className="text-sm font-medium">
             Email hoặc Tên đăng nhập
           </label>

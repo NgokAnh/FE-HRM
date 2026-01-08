@@ -1,23 +1,33 @@
+// src/routes/AppRoutes.jsx
 import { Routes, Route, Navigate } from "react-router-dom";
-import DashboardLayout from "../layouts/DashboardLayout";
 import ProtectedRoute from "./ProtectedRoute";
 
-import Login from "../pages/Login";
-import Signup from "../pages/Signup";
-
+// Admin layouts & pages
+import DashboardLayout from "../layouts/DashboardLayout";
 import Dashboard from "../pages/Dashboard";
 import Employees from "../pages/Employee/Employees";
 import Attendance from "../pages/Attendance";
-import Payroll from "../pages/Payroll";
-import Reports from "../pages/Reports";
 import WorkSchedule from "../pages/WorkSchedule";
+import Payroll from "../pages/Payroll";
 import PayrollDetail from "../pages/PayrollDetail";
+import Reports from "../pages/Reports";
 import Shift from "../pages/Shift/Shift";
+
+// Employee layouts & pages
+import EmployeeLayout from "../layouts/EmployeeLayout";
+import Overview from "../pages/EmployeePages/Overview";
+import EmpAttendance from "../pages/EmployeePages/Attendance";
+import Schedule from "../pages/EmployeePages/Schedule";
+import EmpPayroll from "../pages/EmployeePages/Payroll";
+
+// Auth pages
+import Login from "../pages/Login";
+import Signup from "../pages/Signup";
 
 export default function AppRoutes() {
   return (
     <Routes>
-      {/* ROOT - Redirect to admin */}
+      {/* ROOT */}
       <Route path="/" element={<Navigate to="/admin" replace />} />
 
       {/* PUBLIC */}
@@ -28,7 +38,7 @@ export default function AppRoutes() {
       <Route
         path="/admin"
         element={
-          <ProtectedRoute>
+          <ProtectedRoute allowedRoles={["ADMIN"]}>
             <DashboardLayout />
           </ProtectedRoute>
         }
@@ -41,8 +51,25 @@ export default function AppRoutes() {
         <Route path="payroll/:month" element={<PayrollDetail />} />
         <Route path="reports" element={<Reports />} />
         <Route path="shift" element={<Shift />} />
-
       </Route>
+
+      {/* EMPLOYEE */}
+      <Route
+        path="/employee"
+        element={
+          <ProtectedRoute allowedRoles={["EMPLOYEE"]}>
+            <EmployeeLayout />
+          </ProtectedRoute>
+        }
+      >
+        <Route index element={<Overview />} />
+        <Route path="attendance" element={<EmpAttendance />} />
+        <Route path="schedule" element={<Schedule />} />
+        <Route path="payroll" element={<EmpPayroll />} />
+      </Route>
+
+      {/* 404 fallback */}
+      <Route path="*" element={<div className="p-6 text-center">Page Not Found</div>} />
     </Routes>
   );
 }
