@@ -58,7 +58,7 @@ export async function createShift(dto) {
 export async function updateShift(id, dto) {
   if (id === undefined || id === null) throw new Error("id is required");
   if (!dto) throw new Error("dto is required");
-  const response = await axiosClient.patch(`${BASE_URL}/${id}`, dto);
+  const response = await axiosClient.put(`${BASE_URL}/${id}`, dto);
   return extractData(response);
 }
 

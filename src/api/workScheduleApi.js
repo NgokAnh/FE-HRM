@@ -8,6 +8,15 @@ const extractData = (response) => {
   return body && typeof body === "object" && "data" in body ? body.data : body;
 };
 
+const extractErrorMessage = (error) => {
+  const data = error?.response?.data;
+  if (!data) return error?.message || "Request failed";
+  if (typeof data === "string") return data;
+  if (typeof data.message === "string") return data.message;
+  if (typeof data.error === "string") return data.error;
+  return error?.message || "Request failed";
+};
+
 function assertId(id, name = "id") {
   if (id === undefined || id === null || id === "") {
     throw new Error(`${name} is required`);
@@ -24,56 +33,80 @@ function assertDate(dateStr, name = "date") {
 
 /** GET /api/v1/work-schedules */
 export async function getWorkSchedules() {
-  const response = await axiosClient.get(BASE_URL);
-  const data = extractData(response);
-  if (!Array.isArray(data)) {
-    throw new Error("Expected work schedules array but got: " + typeof data);
+  try {
+    const response = await axiosClient.get(BASE_URL);
+    const data = extractData(response);
+    if (!Array.isArray(data)) {
+      throw new Error("Expected work schedules array but got: " + typeof data);
+    }
+    return data;
+  } catch (error) {
+    throw new Error(extractErrorMessage(error));
   }
-  return data;
 }
 
 /** GET /api/v1/work-schedules/{id} */
 export async function getWorkSchedule(id) {
   assertId(id, "id");
-  const response = await axiosClient.get(`${BASE_URL}/${id}`);
-  return extractData(response);
+  try {
+    const response = await axiosClient.get(`${BASE_URL}/${id}`);
+    return extractData(response);
+  } catch (error) {
+    throw new Error(extractErrorMessage(error));
+  }
 }
 
 /** GET /api/v1/work-schedules/employee/{employeeId} */
 export async function getWorkSchedulesByEmployee(employeeId) {
   assertId(employeeId, "employeeId");
-  const response = await axiosClient.get(`${BASE_URL}/employee/${employeeId}`);
-  const data = extractData(response);
-  if (!Array.isArray(data)) throw new Error("Expected array but got: " + typeof data);
-  return data;
+  try {
+    const response = await axiosClient.get(`${BASE_URL}/employee/${employeeId}`);
+    const data = extractData(response);
+    if (!Array.isArray(data)) throw new Error("Expected array but got: " + typeof data);
+    return data;
+  } catch (error) {
+    throw new Error(extractErrorMessage(error));
+  }
 }
 
 /** GET /api/v1/work-schedules/shift/{shiftId} */
 export async function getWorkSchedulesByShift(shiftId) {
   assertId(shiftId, "shiftId");
-  const response = await axiosClient.get(`${BASE_URL}/shift/${shiftId}`);
-  const data = extractData(response);
-  if (!Array.isArray(data)) throw new Error("Expected array but got: " + typeof data);
-  return data;
+  try {
+    const response = await axiosClient.get(`${BASE_URL}/shift/${shiftId}`);
+    const data = extractData(response);
+    if (!Array.isArray(data)) throw new Error("Expected array but got: " + typeof data);
+    return data;
+  } catch (error) {
+    throw new Error(extractErrorMessage(error));
+  }
 }
 
 /** GET /api/v1/work-schedules/date/{workDate} */
 export async function getWorkSchedulesByDate(workDate) {
   assertDate(workDate, "workDate");
-  const response = await axiosClient.get(`${BASE_URL}/date/${workDate}`);
-  const data = extractData(response);
-  if (!Array.isArray(data)) throw new Error("Expected array but got: " + typeof data);
-  return data;
+  try {
+    const response = await axiosClient.get(`${BASE_URL}/date/${workDate}`);
+    const data = extractData(response);
+    if (!Array.isArray(data)) throw new Error("Expected array but got: " + typeof data);
+    return data;
+  } catch (error) {
+    throw new Error(extractErrorMessage(error));
+  }
 }
 
 /** GET /api/v1/work-schedules/employee/{employeeId}/date/{workDate} */
 export async function getWorkSchedulesByEmployeeAndDate(employeeId, workDate) {
   assertId(employeeId, "employeeId");
   assertDate(workDate, "workDate");
-  const response = await axiosClient.get(`${BASE_URL}/employee/${employeeId}/date/${workDate}`);
-  const data = extractData(response);
-  if (!Array.isArray(data)) throw new Error("Expected array but got: " + typeof data);
-  return data;
+  try {
+    const response = await axiosClient.get(`${BASE_URL}/employee/${employeeId}/date/${workDate}`);
+    const data = extractData(response);
+    if (!Array.isArray(data)) throw new Error("Expected array but got: " + typeof data);
+    return data;
+  } catch (error) {
+    throw new Error(extractErrorMessage(error));
+  }
 }
 
 /**
@@ -84,30 +117,46 @@ export async function getWorkSchedulesByEmployeeDateRange(employeeId, startDate,
   assertId(employeeId, "employeeId");
   assertDate(startDate, "startDate");
   assertDate(endDate, "endDate");
-  const qs = new URLSearchParams({ startDate, endDate }).toString();
-  const response = await axiosClient.get(`${BASE_URL}/employee/${employeeId}/date-range?${qs}`);
-  return extractData(response);
+  try {
+    const qs = new URLSearchParams({ startDate, endDate }).toString();
+    const response = await axiosClient.get(`${BASE_URL}/employee/${employeeId}/date-range?${qs}`);
+    return extractData(response);
+  } catch (error) {
+    throw new Error(extractErrorMessage(error));
+  }
 }
 
 /** POST /api/v1/work-schedules  (body: WorkSchedule) */
 export async function createWorkSchedule(workSchedule) {
   if (!workSchedule) throw new Error("workSchedule is required");
-  const response = await axiosClient.post(BASE_URL, workSchedule);
-  return extractData(response);
+  try {
+    const response = await axiosClient.post(BASE_URL, workSchedule);
+    return extractData(response);
+  } catch (error) {
+    throw new Error(extractErrorMessage(error));
+  }
 }
 
 /** PUT /api/v1/work-schedules/{id} (body: WorkSchedule) */
 export async function updateWorkSchedule(id, workSchedule) {
   assertId(id, "id");
   if (!workSchedule) throw new Error("workSchedule is required");
-  const response = await axiosClient.patch(`${BASE_URL}/${id}`, workSchedule);
-  return extractData(response);
+  try {
+    const response = await axiosClient.put(`${BASE_URL}/${id}`, workSchedule);
+    return extractData(response);
+  } catch (error) {
+    throw new Error(extractErrorMessage(error));
+  }
 }
 
 /** DELETE /api/v1/work-schedules/{id} */
 export async function deleteWorkSchedule(id) {
   assertId(id, "id");
-  await axiosClient.delete(`${BASE_URL}/${id}`);
+  try {
+    await axiosClient.delete(`${BASE_URL}/${id}`);
+  } catch (error) {
+    throw new Error(extractErrorMessage(error));
+  }
 }
 
 /**
@@ -119,15 +168,19 @@ export async function existsWorkSchedule(employeeId, shiftId, workDate) {
   assertId(shiftId, "shiftId");
   assertDate(workDate, "workDate");
 
-  const qs = new URLSearchParams({
-    employeeId: String(employeeId),
-    shiftId: String(shiftId),
-    workDate: String(workDate),
-  }).toString();
+  try {
+    const qs = new URLSearchParams({
+      employeeId: String(employeeId),
+      shiftId: String(shiftId),
+      workDate: String(workDate),
+    }).toString();
 
-  const response = await axiosClient.get(`${BASE_URL}/exists?${qs}`);
-  const data = extractData(response);
-  return !!data;
+    const response = await axiosClient.get(`${BASE_URL}/exists?${qs}`);
+    const data = extractData(response);
+    return !!data;
+  } catch (error) {
+    throw new Error(extractErrorMessage(error));
+  }
 }
 
 /**
