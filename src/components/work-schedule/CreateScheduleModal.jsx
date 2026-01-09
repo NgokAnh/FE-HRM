@@ -163,10 +163,15 @@ export default function CreateScheduleModal({
             return;
           }
         }
-        await updateWorkSchedule(id, basePayload);
-        onSaved?.();
-        onClose?.();
-        return;
+        try {
+          await updateWorkSchedule(id, basePayload);
+          onSaved?.();
+          onClose?.();
+          return;
+        } catch (err) {
+          setError(err?.message || "Không cập nhật được lịch.");
+          return;
+        }
       }
 
       // ========= ADD (có thể lặp daily) =========
@@ -180,7 +185,6 @@ export default function CreateScheduleModal({
 
       const created = [];
       const skipped = [];
-      const failed = [];
 
       for (const d of datesToCreate) {
         try {
@@ -200,25 +204,18 @@ export default function CreateScheduleModal({
           await createWorkSchedule({ ...basePayload, workDate: d });
           created.push(d);
         } catch (err) {
-          failed.push({ date: d, message: err?.message || "Unknown error" });
+          setError(`Không tạo được lịch cho ngày ${d}: ${err?.message || "Unknown error"}`);
+          return;
         }
       }
 
       if (created.length === 0) {
-        setError(
-          failed.length
-            ? `Không tạo được lịch. Lỗi: ${failed[0].date} - ${failed[0].message}`
-            : "Không tạo được lịch (có thể bị trùng hết)."
-        );
+        setError("Không tạo được lịch (có thể bị trùng hết).");
         return;
       }
 
-      if (skipped.length || failed.length) {
-        const parts = [];
-        if (created.length) parts.push(`Đã tạo: ${created.length}`);
-        if (skipped.length) parts.push(`Trùng: ${skipped.length}`);
-        if (failed.length) parts.push(`Lỗi: ${failed.length}`);
-        alert(parts.join(" • "));
+      if (skipped.length) {
+        alert(`Đã tạo: ${created.length} • Trùng: ${skipped.length}`);
       }
 
       onSaved?.();
