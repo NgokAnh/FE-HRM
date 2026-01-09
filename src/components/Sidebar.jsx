@@ -36,7 +36,7 @@ export default function Sidebar() {
   };
 
   return (
-    <aside className="w-64 bg-white border-r min-h-screen px-4 py-6 flex flex-col">
+    <aside className="w-64 shrink-0 bg-white border-r min-h-screen px-4 py-6 flex flex-col fixed left-0 top-0">
       {/* LOGO */}
       <h2 className="text-xl font-bold text-blue-600 mb-8">
         QUẢN LÝ NHÂN SỰ

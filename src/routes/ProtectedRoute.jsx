@@ -1,16 +1,18 @@
 import { Navigate } from "react-router-dom";
 import { isAuthenticated } from "../utils/auth";
 
-export default function ProtectedRoute({ children, role }) {
-  // Check if user is authenticated
+export default function ProtectedRoute({ children, allowedRoles }) {
+  // 1. Chưa login
   if (!isAuthenticated()) {
     return <Navigate to="/login" replace />;
   }
 
-  // Check role if required
-  if (role) {
+  // 2. Kiểm tra role nếu có yêu cầu
+  if (allowedRoles && allowedRoles.length > 0) {
     const user = JSON.parse(localStorage.getItem("user"));
-    if (user?.role !== role) {
+    const roleName = user?.role?.name;
+
+    if (!roleName || !allowedRoles.includes(roleName)) {
       return <Navigate to="/login" replace />;
     }
   }

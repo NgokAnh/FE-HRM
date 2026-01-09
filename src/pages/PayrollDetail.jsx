@@ -1,89 +1,92 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useParams } from "react-router-dom";
 import PayrollSlipModal from "../components/payroll/PayrollSlipModal";
-
-/* ================= MOCK DATA ================= */
-const payrollByMonth = {
-  "12-2023": {
-    summary: {
-      totalEmployee: 124,
-      baseSalary: "1.250.000.000 đ",
-      allowance: "150.000.000 đ",
-      netSalary: "1.350.500.000 đ",
-    },
-    details: [
-      {
-        id: "NV001",
-        name: "Nguyễn Văn A",
-        email: "nguyen.a@company.com",
-        department: "Kỹ thuật",
-        baseSalary: 20000000,
-        allowance: 2000000,
-        deduction: 1000000,
-        net: 21000000,
-        status: "pending",
-      },
-      {
-        id: "NV002",
-        name: "Trần Thị B",
-        email: "tran.b@company.com",
-        department: "Marketing",
-        baseSalary: 15000000,
-        allowance: 1500000,
-        deduction: 800000,
-        net: 15700000,
-        status: "approved",
-      },
-    ],
-  },
-
-  "11-2023": {
-    summary: {
-      totalEmployee: 118,
-      baseSalary: "1.180.000.000 đ",
-      allowance: "120.000.000 đ",
-      netSalary: "1.260.000.000 đ",
-    },
-    details: [
-      {
-        id: "NV010",
-        name: "Phạm Minh C",
-        email: "pham.c@company.com",
-        department: "Nhân sự",
-        baseSalary: 12000000,
-        allowance: 500000,
-        deduction: 600000,
-        net: 11900000,
-        status: "approved",
-      },
-    ],
-  },
-};
+import { getSalaries } from "../api/salaryApi"; // giả sử API đã export
 
 const formatMoney = (v) => v.toLocaleString("vi-VN");
 
 export default function PayrollDetail() {
-  const { month } = useParams();
-
+  const { month } = useParams(); // monthKey dạng "12-2023"
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+  const [summary, setSummary] = useState(null);
+  const [payrollDetails, setPayrollDetails] = useState([]);
   const [openSlip, setOpenSlip] = useState(false);
   const [selectedEmployee, setSelectedEmployee] = useState(null);
 
-  const data = payrollByMonth[month];
+  useEffect(() => {
+    const fetchPayroll = async () => {
+      try {
+        setLoading(true);
+        setError("");
 
-  if (!data) {
-    return (
-      <div className="p-6 text-red-500">
-        Không tìm thấy dữ liệu bảng lương
-      </div>
-    );
-  }
+        const [m, y] = month.split("-").map(Number);
 
-  const { summary, details: payrollDetails } = data;
+        const allSalaries = await getSalaries({ page: 1, size: 1000 });
+
+        // Lọc theo tháng và năm
+        const filtered = allSalaries.filter(
+          (item) => Number(item.month) === m && Number(item.year) === y
+        );
+
+        if (!filtered.length) {
+          setError("Không tìm thấy dữ liệu bảng lương");
+          return;
+        }
+
+        // Tạo summary
+        const totalEmployee = filtered.length;
+        const baseSalary = filtered.reduce((sum, i) => sum + Number(i.baseSalary || 0), 0);
+        const allowance = filtered.reduce(
+          (sum, i) => sum + (Number(i.shiftSalary || 0) + Number(i.otSalary || 0)),
+          0
+        );
+        const netSalary = filtered.reduce((sum, i) => sum + Number(i.finalSalary || 0), 0);
+
+        setSummary({
+          totalEmployee,
+          baseSalary: formatMoney(baseSalary) + " đ",
+          allowance: formatMoney(allowance) + " đ",
+          netSalary: formatMoney(netSalary) + " đ",
+        });
+
+        // Tạo chi tiết
+        const details = filtered.map((emp) => ({
+          id: emp.employee.id,
+          name: emp.employee.fullname,
+          email: emp.employee.email || "",
+          department: emp.employee.department || "",
+          baseSalary: Number(emp.baseSalary || 0),
+          allowance: Number(emp.shiftSalary || 0) + Number(emp.otSalary || 0),
+          deduction: Number(emp.penaltyTotal || 0),
+          net: Number(emp.finalSalary || 0),
+          status: emp.status.toLowerCase() === "paid" ? "approved" : "pending",
+        }));
+
+        setPayrollDetails(details);
+      } catch (err) {
+        console.error(err);
+        setError(err.message || "Lỗi khi tải dữ liệu bảng lương");
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchPayroll();
+  }, [month]);
 
   const handleViewSlip = (emp) => {
     setSelectedEmployee(emp);
     setOpenSlip(true);
   };
+
+  if (loading) {
+    return <div className="p-6 text-gray-500">Đang tải dữ liệu...</div>;
+  }
+
+  if (error) {
+    return <div className="p-6 text-red-500">{error}</div>;
+  }
 
   return (
     <>
@@ -146,14 +149,11 @@ export default function PayrollDetail() {
               {payrollDetails.map((emp) => (
                 <tr key={emp.id} className="border-t hover:bg-gray-50">
                   <td className="p-4 font-medium">{emp.id}</td>
-
                   <td className="p-4">
                     <div className="font-medium">{emp.name}</div>
                     <div className="text-xs text-gray-500">{emp.email}</div>
                   </td>
-
                   <td className="p-4">{emp.department}</td>
-
                   <td className="p-4 text-right">{formatMoney(emp.baseSalary)}</td>
                   <td className="p-4 text-right text-green-600">
                     + {formatMoney(emp.allowance)}
@@ -161,11 +161,9 @@ export default function PayrollDetail() {
                   <td className="p-4 text-right text-red-500">
                     - {formatMoney(emp.deduction)}
                   </td>
-
                   <td className="p-4 text-right font-semibold text-blue-600">
                     {formatMoney(emp.net)}
                   </td>
-
                   <td className="p-4 text-center">
                     {emp.status === "approved" ? (
                       <span className="px-3 py-1 bg-green-100 text-green-700 rounded-full">
@@ -177,7 +175,6 @@ export default function PayrollDetail() {
                       </span>
                     )}
                   </td>
-
                   <td className="p-4 text-center">
                     <button
                       onClick={() => handleViewSlip(emp)}
