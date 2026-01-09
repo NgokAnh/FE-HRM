@@ -119,13 +119,13 @@ export default function Shifts() {
             Xóa bộ lọc
           </button>
 
-          <button
+          {/* <button
             onClick={() => {}}
             className="px-4 py-2 rounded-lg bg-blue-600 text-white"
             title="Đang lọc realtime (client-side)"
           >
             Áp dụng
-          </button>
+          </button> */}
         </div>
 
         <div className="flex gap-3">
