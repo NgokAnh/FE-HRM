@@ -65,13 +65,13 @@ export async function createEmployee(dto) {
   return extractData(response);
 }
 
-// ===================== UPDATE BASIC INFO =====================
+// ===================== UPDATE =====================
 export async function updateEmployeeBasicInfo(id, employee) {
   if (id === undefined || id === null) throw new Error("id is required");
   if (!employee) throw new Error("employee is required");
 
   const response = await axiosClient.put(
-    `${BASE_URL}/${id}/basic-info`,
+    `${BASE_URL}/${id}`,
     employee
   );
   return extractData(response);
