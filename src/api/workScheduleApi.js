@@ -100,7 +100,7 @@ export async function createWorkSchedule(workSchedule) {
 export async function updateWorkSchedule(id, workSchedule) {
   assertId(id, "id");
   if (!workSchedule) throw new Error("workSchedule is required");
-  const response = await axiosClient.patch(`${BASE_URL}/${id}`, workSchedule);
+  const response = await axiosClient.put(`${BASE_URL}/${id}`, workSchedule);
   return extractData(response);
 }
 
