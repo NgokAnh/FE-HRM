@@ -24,17 +24,17 @@ export default function BottomNav() {
   };
 
   return (
-    <div className="md:hidden fixed bottom-0 left-0 w-full bg-white border-t border-gray-200 flex justify-around py-2 shadow-md">
+    <div className="md:hidden fixed bottom-0 left-0 right-0 w-full bg-white dark:bg-surface-dark border-t border-gray-200 dark:border-gray-700 flex justify-around py-2 shadow-lg z-50">
       {navItems.map((item) => (
         <NavLink
           key={item.to}
           to={item.to}
           end={item.to === "/employee"} // để /employee match đúng khi index
           className={({ isActive }) =>
-            `flex flex-col items-center text-xs transition-colors px-2 py-1 rounded ${
+            `flex flex-col items-center text-xs transition-colors px-2 py-1 rounded min-w-[60px] ${
               isActive
-                ? "text-blue-600 bg-blue-50 font-semibold"
-                : "text-gray-500 hover:text-gray-800 hover:bg-gray-100"
+                ? "text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/20 font-semibold"
+                : "text-gray-500 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700"
             }`
           }
         >
@@ -46,7 +46,7 @@ export default function BottomNav() {
       {/* Logout button */}
       <button
         onClick={handleLogout}
-        className="flex flex-col items-center text-xs text-red-600 hover:text-red-800 hover:bg-red-50 px-2 py-1 rounded transition-colors"
+        className="flex flex-col items-center text-xs text-red-600 dark:text-red-400 hover:text-red-800 dark:hover:text-red-300 hover:bg-red-50 dark:hover:bg-red-900/20 px-2 py-1 rounded transition-colors min-w-[60px]"
       >
         <span className="material-symbols-outlined text-2xl">logout</span>
         Đăng xuất

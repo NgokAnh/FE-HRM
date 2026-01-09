@@ -1,8 +1,8 @@
 import { useState, useEffect } from "react";
 import AttendanceSetting from "./AttendanceSetting";
 import { getActiveShifts } from "../api/shiftApi";
-import { getWorkSchedulesByDate, getWorkSchedulesByShiftAndDateRange, getWorkSchedulesByEmployeeAndDateRange } from "../api/workScheduleApi";
-import { getAttendanceByWorkSchedule } from "../api/attendanceApi";
+import { getWorkSchedulesByDate, getWorkSchedulesByShiftAndDateRange, getWorkSchedulesByEmployeeAndDateRange, getWeeklySchedulesByShift } from "../api/workScheduleApi";
+import { getAttendanceByWorkSchedule, getWeeklyAttendanceSummary } from "../api/attendanceApi";
 import { getActiveEmployees } from "../api/employeeApi";
 
 /* ================= MOCK DATA ================= */
@@ -397,6 +397,51 @@ function WeekByShiftTable({ selectedWeek }) {
       setLoading(true);
       setError(null);
       try {
+        const startDate = selectedWeek[0];
+        const endDate = selectedWeek[6];
+
+        console.log('📅 [API V2] Fetching weekly shift schedules:', { startDate, endDate });
+
+        // 🆕 USE NEW API V2: Single call instead of 206 calls
+        const data = await getWeeklySchedulesByShift(startDate, endDate);
+
+        console.log('✅ [API V2] Shift schedules received:', {
+          shiftCount: data?.shifts?.length || 0,
+          dateRange: `${data?.startDate} ~ ${data?.endDate}`
+        });
+
+        // Transform API v2 response to match UI format
+        const shiftsData = data.shifts.map(item => item.shift);
+        setShifts(shiftsData);
+
+        // Convert to shiftSchedules map: { [shiftId]: { shift, dailySchedules } }
+        const shiftSchedulesMap = {};
+        data.shifts.forEach(item => {
+          shiftSchedulesMap[item.shift.id] = {
+            shift: item.shift,
+            dailySchedules: item.dailySchedules
+          };
+        });
+        setShiftSchedules(shiftSchedulesMap);
+
+      } catch (err) {
+        console.error("❌ Error fetching weekly shift schedules:", err);
+        setError(err.message);
+      } finally {
+        setLoading(false);
+      }
+    }
+
+    fetchData();
+  }, [selectedWeek]);
+
+  // ============ CODE CŨ (3-tier API - 206 calls) - GIỮ LẠI ĐỂ PHÒNG KHI CẦN ============
+  /*
+  useEffect(() => {
+    async function fetchData() {
+      setLoading(true);
+      setError(null);
+      try {
         // 1. Fetch active shifts
         const shiftsData = await getActiveShifts();
         setShifts(shiftsData);
@@ -451,6 +496,8 @@ function WeekByShiftTable({ selectedWeek }) {
 
     fetchData();
   }, [selectedWeek]);
+  */
+  // ============ END CODE CŨ ============
 
   if (loading) {
     return (
@@ -644,6 +691,48 @@ function DailyAttendanceTable({ selectedDate }) {
       setLoading(true);
       setError(null);
       try {
+        console.log('📅 [API V2] Fetching daily schedules:', { date: selectedDate });
+
+        // 🆕 USE API V2: Single call với startDate = endDate
+        const data = await getWeeklySchedulesByShift(selectedDate, selectedDate);
+
+        console.log('✅ [API V2] Daily schedules received:', {
+          shiftCount: data?.shifts?.length || 0,
+          date: selectedDate
+        });
+
+        // Extract shifts
+        const shiftsData = data.shifts.map(item => item.shift);
+        setShifts(shiftsData);
+
+        // Group schedules by shift ID
+        const grouped = {};
+        data.shifts.forEach(shiftData => {
+          // Get schedules for the selected date only (should be only 1 day)
+          const dailySchedule = shiftData.dailySchedules.find(ds => ds.date === selectedDate);
+          grouped[shiftData.shift.id] = dailySchedule ? dailySchedule.schedules : [];
+        });
+
+        setSchedulesByShift(grouped);
+
+      } catch (err) {
+        console.error("❌ Error fetching daily schedules:", err);
+        setError(err.message);
+      } finally {
+        setLoading(false);
+      }
+    }
+
+    fetchData();
+  }, [selectedDate]);
+
+  // ============ CODE CŨ (N+2 API calls) - GIỮ LẠI ĐỂ PHÒNG KHI CẦN ============
+  /*
+  useEffect(() => {
+    async function fetchData() {
+      setLoading(true);
+      setError(null);
+      try {
         // 1. Fetch active shifts
         const shiftsData = await getActiveShifts();
         setShifts(shiftsData);
@@ -690,6 +779,8 @@ function DailyAttendanceTable({ selectedDate }) {
 
     fetchData();
   }, [selectedDate]);
+  */
+  // ============ END CODE CŨ ============
 
   if (loading) {
     return (
@@ -763,6 +854,79 @@ function SummaryAttendanceTable({ selectedWeek }) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
+  useEffect(() => {
+    async function fetchData() {
+      setLoading(true);
+      setError(null);
+      try {
+        const startDate = selectedWeek[0];
+        const endDate = selectedWeek[6];
+
+        console.log('📅 [API V2] Fetching weekly summary:', { startDate, endDate });
+
+        // 🆕 USE NEW API V2: Single call instead of 751 calls
+        const summaryData = await getWeeklyAttendanceSummary(startDate, endDate);
+
+        console.log('✅ [API V2] Received data:', {
+          employeeCount: summaryData?.employees?.length || 0,
+          dateRange: `${summaryData?.startDate} ~ ${summaryData?.endDate}`
+        });
+
+        // Transform API v2 response to match UI format
+        const formatMinutesToHours = (minutes) => {
+          if (minutes === 0) return "0h";
+          const hours = Math.floor(minutes / 60);
+          const mins = minutes % 60;
+          if (mins === 0) return `${hours}h`;
+          return `${hours}h ${mins}m`;
+        };
+
+        const stats = summaryData.employees.map(item => ({
+          employee: item.employee,
+          noData: item.statistics.totalScheduled === 0,
+          workShifts: {
+            count: item.statistics.worked.count,
+            hours: item.statistics.worked.totalHours > 0
+              ? `${item.statistics.worked.totalHours.toFixed(0)}h`
+              : "0h"
+          },
+          offShifts: {
+            count: item.statistics.absent.count,
+            hours: item.statistics.absent.totalHours > 0
+              ? `${item.statistics.absent.totalHours.toFixed(0)}h`
+              : "0h"
+          },
+          late: {
+            count: item.statistics.late.count,
+            hours: formatMinutesToHours(item.statistics.late.totalMinutes)
+          },
+          early: {
+            count: item.statistics.earlyLeave.count,
+            hours: formatMinutesToHours(item.statistics.earlyLeave.totalMinutes)
+          },
+          overtime: {
+            count: item.statistics.overtime.count,
+            hours: formatMinutesToHours(item.statistics.overtime.totalMinutes)
+          }
+        }));
+
+        setEmployeeStats(stats);
+
+      } catch (err) {
+        console.error("❌ Error fetching weekly summary:", err);
+        setError(err.message);
+      } finally {
+        setLoading(false);
+      }
+    }
+
+    if (selectedWeek && selectedWeek.length === 7) {
+      fetchData();
+    }
+  }, [selectedWeek]);
+
+  // ============ CODE CŨ (3-tier API - 751 calls) - GIỮ LẠI ĐỂ PHÒNG KHI CẦN ============
+  /*
   useEffect(() => {
     async function fetchData() {
       setLoading(true);
@@ -924,6 +1088,8 @@ function SummaryAttendanceTable({ selectedWeek }) {
       fetchData();
     }
   }, [selectedWeek]);
+  */
+  // ============ END CODE CŨ ============
 
   if (loading) {
     return (
@@ -992,6 +1158,79 @@ function MonthAttendanceTable({ selectedMonth }) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
+  useEffect(() => {
+    async function fetchData() {
+      setLoading(true);
+      setError(null);
+      try {
+        const startDate = selectedMonth.startDate;
+        const endDate = selectedMonth.endDate;
+
+        console.log('📅 [API V2] Fetching month summary:', { startDate, endDate });
+
+        // 🆕 USE API V2: Single call for entire month
+        const summaryData = await getWeeklyAttendanceSummary(startDate, endDate);
+
+        console.log('✅ [API V2] Month data received:', {
+          employeeCount: summaryData?.employees?.length || 0,
+          dateRange: `${summaryData?.startDate} ~ ${summaryData?.endDate}`
+        });
+
+        // Transform API v2 response to match UI format
+        const formatMinutesToHours = (minutes) => {
+          if (minutes === 0) return "0h";
+          const hours = Math.floor(minutes / 60);
+          const mins = minutes % 60;
+          if (mins === 0) return `${hours}h`;
+          return `${hours}h ${mins}m`;
+        };
+
+        const stats = summaryData.employees.map(item => ({
+          employee: item.employee,
+          noData: item.statistics.totalScheduled === 0,
+          workShifts: {
+            count: item.statistics.worked.count,
+            hours: item.statistics.worked.totalHours > 0
+              ? `${item.statistics.worked.totalHours.toFixed(0)}h`
+              : "0h"
+          },
+          offShifts: {
+            count: item.statistics.absent.count,
+            hours: item.statistics.absent.totalHours > 0
+              ? `${item.statistics.absent.totalHours.toFixed(0)}h`
+              : "0h"
+          },
+          late: {
+            count: item.statistics.late.count,
+            hours: formatMinutesToHours(item.statistics.late.totalMinutes)
+          },
+          early: {
+            count: item.statistics.earlyLeave.count,
+            hours: formatMinutesToHours(item.statistics.earlyLeave.totalMinutes)
+          },
+          overtime: {
+            count: item.statistics.overtime.count,
+            hours: formatMinutesToHours(item.statistics.overtime.totalMinutes)
+          }
+        }));
+
+        setEmployeeStats(stats);
+
+      } catch (err) {
+        console.error("❌ Error fetching month summary:", err);
+        setError(err.message);
+      } finally {
+        setLoading(false);
+      }
+    }
+
+    if (selectedMonth && selectedMonth.startDate && selectedMonth.endDate) {
+      fetchData();
+    }
+  }, [selectedMonth]);
+
+  // ============ CODE CŨ (3-tier API - 1500+ calls for month) - GIỮ LẠI ĐỂ PHÒNG KHI CẦN ============
+  /*
   useEffect(() => {
     async function fetchData() {
       setLoading(true);
@@ -1152,6 +1391,8 @@ function MonthAttendanceTable({ selectedMonth }) {
       fetchData();
     }
   }, [selectedMonth]);
+  */
+  // ============ END CODE CŨ ============
 
   if (loading) {
     return (
