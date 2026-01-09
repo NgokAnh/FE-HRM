@@ -691,6 +691,48 @@ function DailyAttendanceTable({ selectedDate }) {
       setLoading(true);
       setError(null);
       try {
+        console.log('📅 [API V2] Fetching daily schedules:', { date: selectedDate });
+
+        // 🆕 USE API V2: Single call với startDate = endDate
+        const data = await getWeeklySchedulesByShift(selectedDate, selectedDate);
+
+        console.log('✅ [API V2] Daily schedules received:', {
+          shiftCount: data?.shifts?.length || 0,
+          date: selectedDate
+        });
+
+        // Extract shifts
+        const shiftsData = data.shifts.map(item => item.shift);
+        setShifts(shiftsData);
+
+        // Group schedules by shift ID
+        const grouped = {};
+        data.shifts.forEach(shiftData => {
+          // Get schedules for the selected date only (should be only 1 day)
+          const dailySchedule = shiftData.dailySchedules.find(ds => ds.date === selectedDate);
+          grouped[shiftData.shift.id] = dailySchedule ? dailySchedule.schedules : [];
+        });
+
+        setSchedulesByShift(grouped);
+
+      } catch (err) {
+        console.error("❌ Error fetching daily schedules:", err);
+        setError(err.message);
+      } finally {
+        setLoading(false);
+      }
+    }
+
+    fetchData();
+  }, [selectedDate]);
+
+  // ============ CODE CŨ (N+2 API calls) - GIỮ LẠI ĐỂ PHÒNG KHI CẦN ============
+  /*
+  useEffect(() => {
+    async function fetchData() {
+      setLoading(true);
+      setError(null);
+      try {
         // 1. Fetch active shifts
         const shiftsData = await getActiveShifts();
         setShifts(shiftsData);
@@ -737,6 +779,8 @@ function DailyAttendanceTable({ selectedDate }) {
 
     fetchData();
   }, [selectedDate]);
+  */
+  // ============ END CODE CŨ ============
 
   if (loading) {
     return (

@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useState } from "react";
 import CreateScheduleModal from "../components/work-schedule/CreateScheduleModal";
 import { getEmployees } from "../api/employeeApi";
-import { getWorkSchedulesByDate, deleteWorkSchedule } from "../api/workScheduleApi";
+import { getWorkSchedulesByDate, deleteWorkSchedule, getWeeklySchedulesByShift } from "../api/workScheduleApi";
 
 /* Helper: YYYY-MM-DD */
 const formatDateKey = (date) => {
@@ -80,6 +80,58 @@ export default function WorkSchedule() {
       setLoading(true);
       setError("");
 
+      // Fetch employees
+      const er = await getEmployees();
+      const eData = er?.data ?? er;
+      setEmployees(Array.isArray(eData) ? eData : []);
+
+      // 🆕 USE API V2: Single call instead of 7 calls
+      const startDate = formatDateKey(weekDays[0]);
+      const endDate = formatDateKey(weekDays[6]);
+
+      console.log('📅 [API V2] Fetching weekly schedules:', { startDate, endDate });
+
+      const data = await getWeeklySchedulesByShift(startDate, endDate);
+
+      console.log('✅ [API V2] Weekly schedules received:', {
+        shiftCount: data?.shifts?.length || 0,
+        dateRange: `${data?.startDate} ~ ${data?.endDate}`
+      });
+
+      // Transform shift-based data to flat schedule list
+      const scheduleList = [];
+      
+      data.shifts.forEach(shiftData => {
+        shiftData.dailySchedules.forEach(daily => {
+          daily.schedules.forEach(schedule => {
+            scheduleList.push({
+              id: schedule.id,
+              workDate: schedule.workDate,
+              employee: schedule.employee,
+              shift: shiftData.shift,
+              // Bỏ attendance vì Work Schedule không cần
+            });
+          });
+        });
+      });
+
+      setSchedules(scheduleList);
+
+    } catch (e) {
+      setError(e?.message || "Không tải được lịch làm việc");
+      setSchedules([]);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // ============ CODE CŨ (7 API calls) - GIỮ LẠI ĐỂ PHÒNG KHI CẦN ============
+  /*
+  const fetchWeekData = async () => {
+    try {
+      setLoading(true);
+      setError("");
+
       const er = await getEmployees();
       const eData = er?.data ?? er;
       setEmployees(Array.isArray(eData) ? eData : []);
@@ -98,6 +150,8 @@ export default function WorkSchedule() {
       setLoading(false);
     }
   };
+  */
+  // ============ END CODE CŨ ============
 
   useEffect(() => {
     fetchWeekData();
