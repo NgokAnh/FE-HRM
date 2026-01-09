@@ -70,36 +70,32 @@ const handleSave = async () => {
       hiredDate: form.hiredDate,
       status: form.status,
       password: !isEdit ? form.password || "123456" : undefined,
+      allowance: Number(form.allowance || 0) || null,
 
-      // Lương theo ca
-      employeeSalaryTypes: [
-        {
-          salaryType: "SHIFT",
-          effectiveFrom: form.hiredDate,
-          note: form.note || "",
-        },
-      ],
-      shiftRates: [
+      // Lương theo ca (singular object, không phải array)
+      empSalaryType: {
+        salaryType: "SHIFT",
+        effectiveFrom: form.hiredDate,
+        note: form.note || "",
+      },
+
+      // Shift rates (đổi tên từ shiftRates → empShiftRates)
+      empShiftRates: [
         { dayType: "WEEKDAY", baseRate: Number(form.baseSalaryWeekday || 0), note: form.note || "" },
         { dayType: "SATURDAY", baseRate: Number(form.baseSalarySaturday || 0), note: form.note || "" },
         { dayType: "SUNDAY", baseRate: Number(form.baseSalarySunday || 0), note: form.note || "" },
         { dayType: "HOLIDAY", baseRate: Number(form.baseSalaryHoliday || 0), note: form.note || "" },
       ],
 
-      // OT chung (AFTER_SHIFT)
+      // OT rates (đơn giản hóa - KHÔNG gửi otType và dayType)
       empOtRates: [
         {
-          otType: "AFTER_SHIFT",
-          dayType: "WEEKDAY", // backend chỉ cần 1 ngày, dùng WEEKDAY làm mặc định
           rateMultiplier: Number(form.otRate || 1.5),
           isActive: true,
           effectiveFrom: form.hiredDate,
           effectiveTo: null,
         },
       ],
-
-      // Phụ cấp
-      allowance: Number(form.allowance || 0),
     };
 
     console.log(isEdit ? "✏️ [UPDATE] Sending payload:" : "✏️ [CREATE] Sending payload:", payload);

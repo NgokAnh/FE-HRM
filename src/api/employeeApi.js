@@ -13,14 +13,17 @@ const extractData = (response) => {
 
   if (!body) return body;
 
-  // case: { data: [...] }
+  // case: body itself is array
   if (Array.isArray(body)) return body;
 
-  // case: { data: [...] }
+  // case: { data: [...] } array
   if (Array.isArray(body.data)) return body.data;
 
   // case: { data: { items: [...] } }
   if (Array.isArray(body.data?.items)) return body.data.items;
+
+  // case: { data: { ... } } single object
+  if (body.data && typeof body.data === 'object') return body.data;
 
   // fallback
   return body;
