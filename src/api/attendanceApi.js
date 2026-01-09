@@ -1,3 +1,4 @@
+import axios from "axios";
 import axiosClient, { axiosV2 } from "./axiosClient";
 
 const BASE_URL = "/attendances";
@@ -187,4 +188,24 @@ export async function getMyAttendances(
 
   const data = extractData(response);
   return Array.isArray(data) ? data : [];
+}
+
+export async function updateCheckIn(workScheduleId, checkInTime, isUpdate = true) {
+  const method = isUpdate ? "put" : "post";
+  const res = await axiosClient({
+    method,
+    url: `/attendances/admin/checkin/${workScheduleId}`,
+    data: { checkInTime }
+  });
+  return res.data.data;
+}
+
+export async function updateCheckOut(workScheduleId, checkOutTime, isUpdate = true) {
+  const method = isUpdate ? "put" : "post";
+  const res = await axiosClient({
+    method,
+    url: `/attendances/admin/checkout/${workScheduleId}`,
+    data: { checkOutTime }
+  });
+  return res.data.data;
 }

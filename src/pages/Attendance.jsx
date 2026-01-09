@@ -1,78 +1,14 @@
-import { useState, useEffect } from "react";
+import axios from "axios";
+
+import React, { useState, useEffect } from "react";
 import AttendanceSetting from "./AttendanceSetting";
+import { updateCheckIn, updateCheckOut } from "../api/attendanceApi";
 import { getActiveShifts } from "../api/shiftApi";
 import { getWorkSchedulesByDate, getWorkSchedulesByShiftAndDateRange, getWorkSchedulesByEmployeeAndDateRange, getWeeklySchedulesByShift } from "../api/workScheduleApi";
 import { getAttendanceByWorkSchedule, getWeeklyAttendanceSummary } from "../api/attendanceApi";
 import { getActiveEmployees } from "../api/employeeApi";
 
-/* ================= MOCK DATA ================= */
 
-const summaryData = [
-  {
-    name: "Lê Thị Bích",
-    workDays: { days: 20, hours: "160h" },
-    offDays: { days: 2, hours: "0h" },
-    late: { days: 3, hours: "1h 20m" },
-    early: { days: 1, hours: "45m" },
-    overtime: { days: 4, hours: "12h" },
-  },
-  {
-    name: "Trần Minh Hoàng",
-    workDays: { days: 18, hours: "144h" },
-    offDays: { days: 4, hours: "0h" },
-    late: { days: 0, hours: "-" },
-    early: { days: 2, hours: "1h" },
-    overtime: { days: 3, hours: "8h" },
-  },
-];
-
-const records = [
-  {
-    id: 1,
-    name: "Lê Thị Bích",
-    date: "2024-07-26",
-    checkIn: "08:00",
-    checkOut: "17:05",
-    total: "8h 05m",
-    status: "valid",
-  },
-  {
-    id: 2,
-    name: "Trần Minh Hoàng",
-    date: "2024-07-26",
-    checkIn: "08:15",
-    checkOut: "17:00",
-    total: "7h 45m",
-    status: "late",
-  },
-  {
-    id: 3,
-    name: "Phạm Thùy Dung",
-    date: "2024-07-26",
-    checkIn: "07:55",
-    checkOut: "16:45",
-    total: "7h 50m",
-    status: "early",
-  },
-  {
-    id: 4,
-    name: "Vũ Tiến Dũng",
-    date: "2024-07-26",
-    checkIn: "-",
-    checkOut: "-",
-    total: "0h 0m",
-    status: "absent",
-  },
-  {
-    id: 5,
-    name: "Đặng Mai Anh",
-    date: "2024-07-26",
-    checkIn: "08:02",
-    checkOut: "17:01",
-    total: "7h 59m",
-    status: "pending",
-  },
-];
 
 /* ================= PAGE ================= */
 
@@ -435,69 +371,6 @@ function WeekByShiftTable({ selectedWeek }) {
     fetchData();
   }, [selectedWeek]);
 
-  // ============ CODE CŨ (3-tier API - 206 calls) - GIỮ LẠI ĐỂ PHÒNG KHI CẦN ============
-  /*
-  useEffect(() => {
-    async function fetchData() {
-      setLoading(true);
-      setError(null);
-      try {
-        // 1. Fetch active shifts
-        const shiftsData = await getActiveShifts();
-        setShifts(shiftsData);
-
-        // 2. Fetch work schedules for each shift
-        const startDate = selectedWeek[0];
-        const endDate = selectedWeek[6];
-
-        const shiftSchedulesData = {};
-        await Promise.all(
-          shiftsData.map(async (shift) => {
-            try {
-              const data = await getWorkSchedulesByShiftAndDateRange(
-                shift.id,
-                startDate,
-                endDate
-              );
-
-              // Fetch attendance for each schedule
-              if (data && data.dailySchedules) {
-                for (const daily of data.dailySchedules) {
-                  for (const schedule of daily.schedules) {
-                    try {
-                      const attendance = await getAttendanceByWorkSchedule(
-                        schedule.id,
-                        schedule.employee.id
-                      );
-                      schedule.attendance = attendance;
-                    } catch (err) {
-                      schedule.attendance = null;
-                    }
-                  }
-                }
-              }
-
-              shiftSchedulesData[shift.id] = data;
-            } catch (err) {
-              console.error(`Error fetching schedules for shift ${shift.id}:`, err);
-              shiftSchedulesData[shift.id] = null;
-            }
-          })
-        );
-
-        setShiftSchedules(shiftSchedulesData);
-      } catch (err) {
-        console.error("Error fetching week attendance data:", err);
-        setError(err.message);
-      } finally {
-        setLoading(false);
-      }
-    }
-
-    fetchData();
-  }, [selectedWeek]);
-  */
-  // ============ END CODE CŨ ============
 
   if (loading) {
     return (
@@ -589,93 +462,265 @@ function WeekByShiftTable({ selectedWeek }) {
   );
 }
 
-function WeekEmployeeBox({ schedule, shift }) {
-  const { employee, attendance } = schedule;
 
-  const formatTime = (instantString) => {
-    if (!instantString) return "--";
+function WeekEmployeeBox({ schedule, shift, onSave }) {
+  const { employee, attendance } = schedule;
+  const [isEditing, setIsEditing] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [editData, setEditData] = useState({
+    checkIn: attendance?.checkIn || "",
+    checkOut: attendance?.checkOut || "",
+    status: attendance?.status || "valid",
+  });
+
+  const handleChange = (field, value) => {
+    setEditData(prev => ({ ...prev, [field]: value }));
+  };
+
+  // Chuyển datetime-local sang ISO UTC
+  const localToUTC = (localStr) => localStr ? new Date(localStr).toISOString() : null;
+
+  const handleSave = async () => {
+    setLoading(true);
     try {
-      const date = new Date(instantString);
-      return date.toLocaleTimeString("vi-VN", {
-        hour: "2-digit",
-        minute: "2-digit",
-        hour12: false,
+      const scheduleId = schedule.id;
+      let updatedAttendance = { ...attendance };
+
+      if (editData.checkIn) {
+        updatedAttendance = await updateCheckIn(
+          scheduleId,
+          localToUTC(editData.checkIn),
+          !!attendance?.checkIn // PUT nếu đã có check-in
+        );
+      }
+
+      if (editData.checkOut) {
+        updatedAttendance = await updateCheckOut(
+          scheduleId,
+          localToUTC(editData.checkOut),
+          !!attendance?.checkOut // PUT nếu đã có check-out
+        );
+      }
+
+      setEditData({
+        checkIn: updatedAttendance.checkIn,
+        checkOut: updatedAttendance.checkOut,
+        status: updatedAttendance.status,
       });
+      setIsEditing(false);
+
+      // Callback cho component cha cập nhật state
+      if (onSave) onSave(employee.id, updatedAttendance);
+
     } catch (err) {
-      return "--";
+      console.error("❌ Lỗi khi cập nhật check-in/out:", err);
+      alert(err.response?.data?.message || "Cập nhật thất bại. Vui lòng thử lại.");
+    } finally {
+      setLoading(false);
     }
   };
 
-  const checkInTime = formatTime(attendance?.checkIn);
-  const checkOutTime = formatTime(attendance?.checkOut);
+  const handleCancel = () => {
+    setEditData({
+      checkIn: attendance?.checkIn || "",
+      checkOut: attendance?.checkOut || "",
+      status: attendance?.status || "valid",
+    });
+    setIsEditing(false);
+  };
+
+  const formatTimeForInput = (instant) => {
+    if (!instant) return "";
+    const d = new Date(instant);
+    return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}T${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`;
+  };
+
+  const formatTimeDisplay = (instant) => {
+    if (!instant) return "--";
+    return new Date(instant).toLocaleTimeString("vi-VN", { hour: "2-digit", minute: "2-digit" });
+  };
 
   return (
     <div
-      className="border rounded p-2 bg-gray-50 hover:bg-gray-100 transition-colors text-xs"
-      style={{
-        borderLeftWidth: '3px',
-        borderLeftColor: shift.colorCode || '#3B82F6'
-      }}
+      className="border rounded-lg p-3 min-w-[200px] bg-gray-50 hover:bg-gray-100 transition-colors cursor-pointer"
+      style={{ borderLeftWidth: '4px', borderLeftColor: shift.colorCode || '#3B82F6' }}
+      onClick={() => !isEditing && setIsEditing(true)}
     >
-      <div className="font-medium mb-1 truncate">{employee.fullname}</div>
-      <div className="space-y-0.5 text-[10px] text-gray-600">
-        <div className="flex justify-between">
-          <span>In:</span>
-          <span className="font-medium">{checkInTime}</span>
+      <div className="font-medium text-sm mb-2">{employee.fullname}</div>
+
+      {isEditing ? (
+        <div className="space-y-2 text-xs">
+          <div className="flex flex-col">
+            <label>Check-in:</label>
+            <input
+              type="datetime-local"
+              value={formatTimeForInput(editData.checkIn)}
+              onChange={e => handleChange('checkIn', e.target.value)}
+              className="border px-2 py-1 rounded text-sm"
+              disabled={loading}
+            />
+          </div>
+          <div className="flex flex-col">
+            <label>Check-out:</label>
+            <input
+              type="datetime-local"
+              value={formatTimeForInput(editData.checkOut)}
+              onChange={e => handleChange('checkOut', e.target.value)}
+              className="border px-2 py-1 rounded text-sm"
+              disabled={loading}
+            />
+          </div>
+          <div className="flex gap-2 mt-1">
+            <button
+              onClick={handleSave}
+              disabled={loading}
+              className="px-2 py-1 bg-blue-600 text-white rounded text-xs disabled:opacity-50"
+            >
+              {loading ? "Đang lưu..." : "Lưu"}
+            </button>
+            <button
+              onClick={handleCancel}
+              disabled={loading}
+              className="px-2 py-1 bg-gray-300 text-gray-700 rounded text-xs"
+            >
+              Hủy
+            </button>
+          </div>
         </div>
-        <div className="flex justify-between">
-          <span>Out:</span>
-          <span className="font-medium">{checkOutTime}</span>
+      ) : (
+        <div className="space-y-1 text-xs text-gray-600">
+          <div className="flex justify-between">
+            <span>Check-in:</span>
+            <span className="font-medium">{formatTimeDisplay(editData.checkIn)}</span>
+          </div>
+          <div className="flex justify-between">
+            <span>Check-out:</span>
+            <span className="font-medium">{formatTimeDisplay(editData.checkOut)}</span>
+          </div>
+          <div className="flex justify-between">
+            <span>Trạng thái:</span>
+            <span className="text-gray-400 italic">{editData.status || "--"}</span>
+          </div>
         </div>
-      </div>
+      )}
     </div>
   );
 }
 
 function EmployeeAttendanceBox({ schedule, shift }) {
   const { employee, attendance } = schedule;
+  const [isEditing, setIsEditing] = useState(false);
+  const [editData, setEditData] = useState({
+    checkIn: attendance?.checkIn || "",
+    checkOut: attendance?.checkOut || "",
+    status: attendance?.status || "valid",
+  });
+  const [loading, setLoading] = useState(false);
 
-  // Format time từ Instant (ISO string) sang HH:MM
-  const formatTime = (instantString) => {
-    if (!instantString) return "--";
+  const handleChange = (field, value) => {
+    setEditData(prev => ({ ...prev, [field]: value }));
+  };
+
+  const localToUTC = (localStr) => localStr ? new Date(localStr).toISOString() : null;
+
+  const handleSave = async () => {
+    setLoading(true);
     try {
-      const date = new Date(instantString);
-      return date.toLocaleTimeString("vi-VN", {
-        hour: "2-digit",
-        minute: "2-digit",
-        hour12: false,
+      const scheduleId = schedule.id;
+      let updatedAttendance = { ...attendance };
+
+      if (editData.checkIn) {
+        updatedAttendance = await updateCheckIn(
+          scheduleId,
+          localToUTC(editData.checkIn),
+          !!attendance?.checkIn // PUT nếu đã check-in, POST nếu chưa
+        );
+      }
+
+      if (editData.checkOut) {
+        updatedAttendance = await updateCheckOut(
+          scheduleId,
+          localToUTC(editData.checkOut),
+          !!attendance?.checkOut // PUT nếu đã check-out, POST nếu chưa
+        );
+      }
+
+      setEditData({
+        checkIn: updatedAttendance.checkIn,
+        checkOut: updatedAttendance.checkOut,
+        status: updatedAttendance.status,
       });
+      setIsEditing(false);
     } catch (err) {
-      return "--";
+      console.error("❌ Lỗi khi cập nhật check-in/out:", err);
+      alert("Cập nhật thất bại. Vui lòng thử lại.");
+    } finally {
+      setLoading(false);
     }
   };
 
-  const checkInTime = formatTime(attendance?.checkIn);
-  const checkOutTime = formatTime(attendance?.checkOut);
+  const handleCancel = () => {
+    setEditData({
+      checkIn: attendance?.checkIn || "",
+      checkOut: attendance?.checkOut || "",
+      status: attendance?.status || "valid",
+    });
+    setIsEditing(false);
+  };
+
+  const formatTimeForInput = (instant) => {
+    if (!instant) return "";
+    const d = new Date(instant);
+    return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}T${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`;
+  };
+
+  const formatTimeDisplay = (instant) => {
+    if (!instant) return "--";
+    return new Date(instant).toLocaleTimeString("vi-VN", { hour: "2-digit", minute: "2-digit" });
+  };
 
   return (
     <div
-      className="border rounded-lg p-3 min-w-[200px] bg-gray-50 hover:bg-gray-100 transition-colors"
-      style={{
-        borderLeftWidth: '4px',
-        borderLeftColor: shift.colorCode || '#3B82F6'
-      }}
+      className="border rounded-lg p-3 min-w-[200px] bg-gray-50 hover:bg-gray-100 transition-colors cursor-pointer"
+      style={{ borderLeftWidth: '4px', borderLeftColor: shift.colorCode || '#3B82F6' }}
+      onClick={() => !isEditing && setIsEditing(true)}
     >
       <div className="font-medium text-sm mb-2">{employee.fullname}</div>
-      <div className="space-y-1 text-xs text-gray-600">
-        <div className="flex justify-between">
-          <span>Check-in:</span>
-          <span className="font-medium">{checkInTime}</span>
+
+      {isEditing ? (
+        <div className="space-y-2 text-xs">
+          <div className="flex flex-col">
+            <label>Check-in:</label>
+            <input
+              type="datetime-local"
+              value={formatTimeForInput(editData.checkIn)}
+              onChange={e => handleChange('checkIn', e.target.value)}
+              className="border px-2 py-1 rounded text-sm"
+            />
+          </div>
+          <div className="flex flex-col">
+            <label>Check-out:</label>
+            <input
+              type="datetime-local"
+              value={formatTimeForInput(editData.checkOut)}
+              onChange={e => handleChange('checkOut', e.target.value)}
+              className="border px-2 py-1 rounded text-sm"
+            />
+          </div>
+          <div className="flex gap-2 mt-1">
+            <button onClick={handleSave} disabled={loading} className="px-2 py-1 bg-blue-600 text-white rounded text-xs">
+              {loading ? "Đang lưu..." : "Lưu"}
+            </button>
+            <button onClick={handleCancel} className="px-2 py-1 bg-gray-300 text-gray-700 rounded text-xs">Hủy</button>
+          </div>
         </div>
-        <div className="flex justify-between">
-          <span>Check-out:</span>
-          <span className="font-medium">{checkOutTime}</span>
+      ) : (
+        <div className="space-y-1 text-xs text-gray-600">
+          <div className="flex justify-between"><span>Check-in:</span><span className="font-medium">{formatTimeDisplay(editData.checkIn)}</span></div>
+          <div className="flex justify-between"><span>Check-out:</span><span className="font-medium">{formatTimeDisplay(editData.checkOut)}</span></div>
+          <div className="flex justify-between"><span>Trạng thái:</span><span className="text-gray-400 italic">{editData.status || "--"}</span></div>
         </div>
-        <div className="flex justify-between">
-          <span>Trạng thái:</span>
-          <span className="text-gray-400 italic">--</span>
-        </div>
-      </div>
+      )}
     </div>
   );
 }
@@ -726,61 +771,7 @@ function DailyAttendanceTable({ selectedDate }) {
     fetchData();
   }, [selectedDate]);
 
-  // ============ CODE CŨ (N+2 API calls) - GIỮ LẠI ĐỂ PHÒNG KHI CẦN ============
-  /*
-  useEffect(() => {
-    async function fetchData() {
-      setLoading(true);
-      setError(null);
-      try {
-        // 1. Fetch active shifts
-        const shiftsData = await getActiveShifts();
-        setShifts(shiftsData);
-
-        // 2. Fetch work schedules for the selected date
-        const schedulesData = await getWorkSchedulesByDate(selectedDate);
-
-        // 3. Fetch attendance for each work schedule
-        const schedulesWithAttendance = await Promise.all(
-          schedulesData.map(async (schedule) => {
-            try {
-              const attendance = await getAttendanceByWorkSchedule(
-                schedule.id,
-                schedule.employee.id
-              );
-              return { ...schedule, attendance };
-            } catch (err) {
-              console.error(`Error fetching attendance for schedule ${schedule.id}:`, err);
-              return { ...schedule, attendance: null };
-            }
-          })
-        );
-
-        // 4. Group schedules by shift ID
-        const grouped = {};
-        shiftsData.forEach((shift) => {
-          grouped[shift.id] = [];
-        });
-
-        schedulesWithAttendance.forEach((schedule) => {
-          if (schedule.shift && grouped[schedule.shift.id] !== undefined) {
-            grouped[schedule.shift.id].push(schedule);
-          }
-        });
-
-        setSchedulesByShift(grouped);
-      } catch (err) {
-        console.error("Error fetching attendance data:", err);
-        setError(err.message);
-      } finally {
-        setLoading(false);
-      }
-    }
-
-    fetchData();
-  }, [selectedDate]);
-  */
-  // ============ END CODE CŨ ============
+  
 
   if (loading) {
     return (
@@ -925,171 +916,6 @@ function SummaryAttendanceTable({ selectedWeek }) {
     }
   }, [selectedWeek]);
 
-  // ============ CODE CŨ (3-tier API - 751 calls) - GIỮ LẠI ĐỂ PHÒNG KHI CẦN ============
-  /*
-  useEffect(() => {
-    async function fetchData() {
-      setLoading(true);
-      setError(null);
-      try {
-        // 1. Fetch active employees
-        const employeesData = await getActiveEmployees();
-        setEmployees(employeesData);
-
-        const startDate = selectedWeek[0];
-        const endDate = selectedWeek[6];
-        const now = new Date();
-
-        console.log('📅 Fetching data for week:', { startDate, endDate, employeeCount: employeesData.length });
-
-        // 2. Fetch work schedules and calculate stats for each employee
-        const stats = await Promise.all(
-          employeesData.map(async (emp) => {
-            try {
-              const scheduleData = await getWorkSchedulesByEmployeeAndDateRange(
-                emp.id,
-                startDate,
-                endDate
-              );
-
-              console.log(`👤 Employee ${emp.fullname} (${emp.id}):`, {
-                hasData: !!scheduleData,
-                dailySchedulesCount: scheduleData?.dailySchedules?.length || 0,
-                scheduleData
-              });
-
-              // Nếu không có dữ liệu
-              if (!scheduleData || !scheduleData.dailySchedules || scheduleData.dailySchedules.length === 0) {
-                return {
-                  employee: emp,
-                  noData: true,
-                  workShifts: { count: 0, hours: "0h" },
-                  offShifts: { count: 0, hours: "0h" },
-                  late: { count: 0, hours: "-" },
-                  early: { count: 0, hours: "-" },
-                  overtime: { count: 0, hours: "0h" }
-                };
-              }
-
-              // Fetch attendance cho tất cả work schedules
-              const allSchedules = scheduleData.dailySchedules.flatMap(ds => ds.workSchedules);
-
-              let workedCount = 0;
-              let workedHours = 0;
-              let absentCount = 0;
-              let lateCount = 0;
-              let lateMinutes = 0;
-              let earlyCount = 0;
-              let earlyMinutes = 0;
-              let overtimeCount = 0;
-              let overtimeMinutes = 0;
-
-              for (const schedule of allSchedules) {
-                try {
-                  const attendance = await getAttendanceByWorkSchedule(
-                    schedule.id,
-                    emp.id
-                  );
-
-                  if (attendance && attendance.checkIn) {
-                    // Có chấm công
-                    workedCount++;
-                    workedHours += schedule.shift.standardHours || 0;
-
-                    // Tính late/early/overtime từ attendance
-                    if (attendance.lateTime > 0) {
-                      lateCount++;
-                      lateMinutes += attendance.lateTime;
-                    }
-
-                    // Early leave check
-                    if (attendance.earlyLeaveTime && attendance.earlyLeaveTime > 0) {
-                      earlyCount++;
-                      earlyMinutes += attendance.earlyLeaveTime;
-                    }
-
-                    if (attendance.overtime > 0) {
-                      overtimeCount++;
-                      overtimeMinutes += attendance.overtime;
-                    }
-                  } else {
-                    // Không có chấm công - kiểm tra đã qua thời gian làm việc chưa
-                    const workDateTime = new Date(`${schedule.workDate}T${schedule.shift.endTime}`);
-                    if (now > workDateTime) {
-                      absentCount++;
-                    }
-                  }
-                } catch (err) {
-                  // Không có attendance record
-                  const workDateTime = new Date(`${schedule.workDate}T${schedule.shift.endTime}`);
-                  if (now > workDateTime) {
-                    absentCount++;
-                  }
-                }
-              }
-
-              const formatMinutesToHours = (minutes) => {
-                if (minutes === 0) return "0h";
-                const hours = Math.floor(minutes / 60);
-                const mins = minutes % 60;
-                if (mins === 0) return `${hours}h`;
-                return `${hours}h ${mins}m`;
-              };
-
-              return {
-                employee: emp,
-                noData: false,
-                workShifts: {
-                  count: workedCount,
-                  hours: workedHours > 0 ? `${workedHours.toFixed(0)}h` : "0h"
-                },
-                offShifts: {
-                  count: absentCount,
-                  hours: "0h"
-                },
-                late: {
-                  count: lateCount,
-                  hours: formatMinutesToHours(lateMinutes)
-                },
-                early: {
-                  count: earlyCount,
-                  hours: formatMinutesToHours(earlyMinutes)
-                },
-                overtime: {
-                  count: overtimeCount,
-                  hours: formatMinutesToHours(overtimeMinutes)
-                }
-              };
-            } catch (err) {
-              console.error(`Error fetching data for employee ${emp.id}:`, err);
-              return {
-                employee: emp,
-                noData: true,
-                workShifts: { count: 0, hours: "0h" },
-                offShifts: { count: 0, hours: "0h" },
-                late: { count: 0, hours: "-" },
-                early: { count: 0, hours: "-" },
-                overtime: { count: 0, hours: "0h" }
-              };
-            }
-          })
-        );
-
-        setEmployeeStats(stats);
-      } catch (err) {
-        console.error("Error fetching employee summary data:", err);
-        setError(err.message);
-      } finally {
-        setLoading(false);
-      }
-    }
-
-    if (selectedWeek && selectedWeek.length === 7) {
-      fetchData();
-    }
-  }, [selectedWeek]);
-  */
-  // ============ END CODE CŨ ============
 
   if (loading) {
     return (
@@ -1229,170 +1055,7 @@ function MonthAttendanceTable({ selectedMonth }) {
     }
   }, [selectedMonth]);
 
-  // ============ CODE CŨ (3-tier API - 1500+ calls for month) - GIỮ LẠI ĐỂ PHÒNG KHI CẦN ============
-  /*
-  useEffect(() => {
-    async function fetchData() {
-      setLoading(true);
-      setError(null);
-      try {
-        // 1. Fetch active employees
-        const employeesData = await getActiveEmployees();
-        setEmployees(employeesData);
-
-        const startDate = selectedMonth.startDate;
-        const endDate = selectedMonth.endDate;
-        const now = new Date();
-
-        console.log('📅 Fetching month data:', { startDate, endDate, employeeCount: employeesData.length });
-
-        // 2. Fetch work schedules and calculate stats for each employee
-        const stats = await Promise.all(
-          employeesData.map(async (emp) => {
-            try {
-              const scheduleData = await getWorkSchedulesByEmployeeAndDateRange(
-                emp.id,
-                startDate,
-                endDate
-              );
-
-              console.log(`👤 Employee ${emp.fullname} (${emp.id}):`, {
-                hasData: !!scheduleData,
-                dailySchedulesCount: scheduleData?.dailySchedules?.length || 0
-              });
-
-              // Nếu không có dữ liệu
-              if (!scheduleData || !scheduleData.dailySchedules || scheduleData.dailySchedules.length === 0) {
-                return {
-                  employee: emp,
-                  noData: true,
-                  workShifts: { count: 0, hours: "0h" },
-                  offShifts: { count: 0, hours: "0h" },
-                  late: { count: 0, hours: "-" },
-                  early: { count: 0, hours: "-" },
-                  overtime: { count: 0, hours: "0h" }
-                };
-              }
-
-              // Fetch attendance cho tất cả work schedules
-              const allSchedules = scheduleData.dailySchedules.flatMap(ds => ds.workSchedules);
-
-              let workedCount = 0;
-              let workedHours = 0;
-              let absentCount = 0;
-              let lateCount = 0;
-              let lateMinutes = 0;
-              let earlyCount = 0;
-              let earlyMinutes = 0;
-              let overtimeCount = 0;
-              let overtimeMinutes = 0;
-
-              for (const schedule of allSchedules) {
-                try {
-                  const attendance = await getAttendanceByWorkSchedule(
-                    schedule.id,
-                    emp.id
-                  );
-
-                  if (attendance && attendance.checkIn) {
-                    // Có chấm công
-                    workedCount++;
-                    workedHours += schedule.shift.standardHours || 0;
-
-                    // Tính late/early/overtime từ attendance
-                    if (attendance.lateTime > 0) {
-                      lateCount++;
-                      lateMinutes += attendance.lateTime;
-                    }
-
-                    // Early leave check
-                    if (attendance.earlyLeaveTime && attendance.earlyLeaveTime > 0) {
-                      earlyCount++;
-                      earlyMinutes += attendance.earlyLeaveTime;
-                    }
-
-                    if (attendance.overtime > 0) {
-                      overtimeCount++;
-                      overtimeMinutes += attendance.overtime;
-                    }
-                  } else {
-                    // Không có chấm công - kiểm tra đã qua thời gian làm việc chưa
-                    const workDateTime = new Date(`${schedule.workDate}T${schedule.shift.endTime}`);
-                    if (now > workDateTime) {
-                      absentCount++;
-                    }
-                  }
-                } catch (err) {
-                  // Không có attendance record
-                  const workDateTime = new Date(`${schedule.workDate}T${schedule.shift.endTime}`);
-                  if (now > workDateTime) {
-                    absentCount++;
-                  }
-                }
-              }
-
-              const formatMinutesToHours = (minutes) => {
-                if (minutes === 0) return "0h";
-                const hours = Math.floor(minutes / 60);
-                const mins = minutes % 60;
-                if (mins === 0) return `${hours}h`;
-                return `${hours}h ${mins}m`;
-              };
-
-              return {
-                employee: emp,
-                noData: false,
-                workShifts: {
-                  count: workedCount,
-                  hours: workedHours > 0 ? `${workedHours.toFixed(0)}h` : "0h"
-                },
-                offShifts: {
-                  count: absentCount,
-                  hours: "0h"
-                },
-                late: {
-                  count: lateCount,
-                  hours: formatMinutesToHours(lateMinutes)
-                },
-                early: {
-                  count: earlyCount,
-                  hours: formatMinutesToHours(earlyMinutes)
-                },
-                overtime: {
-                  count: overtimeCount,
-                  hours: formatMinutesToHours(overtimeMinutes)
-                }
-              };
-            } catch (err) {
-              console.error(`Error fetching data for employee ${emp.id}:`, err);
-              return {
-                employee: emp,
-                noData: true,
-                workShifts: { count: 0, hours: "0h" },
-                offShifts: { count: 0, hours: "0h" },
-                late: { count: 0, hours: "-" },
-                early: { count: 0, hours: "-" },
-                overtime: { count: 0, hours: "0h" }
-              };
-            }
-          })
-        );
-
-        setEmployeeStats(stats);
-      } catch (err) {
-        console.error("Error fetching month attendance data:", err);
-        setError(err.message);
-      } finally {
-        setLoading(false);
-      }
-    }
-
-    if (selectedMonth && selectedMonth.startDate && selectedMonth.endDate) {
-      fetchData();
-    }
-  }, [selectedMonth]);
-  */
-  // ============ END CODE CŨ ============
+  
 
   if (loading) {
     return (
