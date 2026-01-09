@@ -100,7 +100,7 @@ export default function WorkSchedule() {
 
       // Transform shift-based data to flat schedule list
       const scheduleList = [];
-      
+
       data.shifts.forEach(shiftData => {
         shiftData.dailySchedules.forEach(daily => {
           daily.schedules.forEach(schedule => {

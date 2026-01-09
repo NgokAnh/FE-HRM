@@ -299,15 +299,15 @@ useEffect(() => {
 
 ## 📊 API Summary
 
-| API Call | Method | Endpoint | Purpose | Called When |
-|----------|--------|----------|---------|-------------|
-| **Get Employees** | GET | `/api/v1/employees` | Lấy danh sách nhân viên | Page load, Modal open |
-| **Get Shifts** | GET | `/api/v1/shifts` | Lấy danh sách ca | Modal open |
-| **Get Schedules by Date** | GET | `/api/v1/work-schedules/date/{date}` | Lấy lịch của 1 ngày | Page load (×7 calls) |
-| **Check Exists** | GET | `/api/v1/work-schedules/exists?...` | Kiểm tra duplicate | Before create |
-| **Create Schedule** | POST | `/api/v1/work-schedules` | Tạo lịch mới | Submit Add form |
-| **Update Schedule** | PATCH | `/api/v1/work-schedules/{id}` | Cập nhật lịch | Submit Edit form |
-| **Delete Schedule** | DELETE | `/api/v1/work-schedules/{id}` | Xóa lịch | Click delete button |
+| API Call                  | Method | Endpoint                             | Purpose                 | Called When           |
+| ------------------------- | ------ | ------------------------------------ | ----------------------- | --------------------- |
+| **Get Employees**         | GET    | `/api/v1/employees`                  | Lấy danh sách nhân viên | Page load, Modal open |
+| **Get Shifts**            | GET    | `/api/v1/shifts`                     | Lấy danh sách ca        | Modal open            |
+| **Get Schedules by Date** | GET    | `/api/v1/work-schedules/date/{date}` | Lấy lịch của 1 ngày     | Page load (×7 calls)  |
+| **Check Exists**          | GET    | `/api/v1/work-schedules/exists?...`  | Kiểm tra duplicate      | Before create         |
+| **Create Schedule**       | POST   | `/api/v1/work-schedules`             | Tạo lịch mới            | Submit Add form       |
+| **Update Schedule**       | PATCH  | `/api/v1/work-schedules/{id}`        | Cập nhật lịch           | Submit Edit form      |
+| **Delete Schedule**       | DELETE | `/api/v1/work-schedules/{id}`        | Xóa lịch                | Click delete button   |
 
 ---
 
