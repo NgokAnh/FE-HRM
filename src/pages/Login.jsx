@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
 import { login as apiLogin } from "../api/authApi";
 
 export default function Login() {
@@ -57,7 +57,7 @@ export default function Login() {
           QUẢN LÝ NHÂN SỰ
         </h1>
         <p className="text-center text-gray-500 mt-1 mb-6">
-          Đăng nhập để tiếp tục quản lý công việc.
+          Đăng nhập để tiếp tục
         </p>
 
         {/* ERROR MESSAGE */}
@@ -115,13 +115,6 @@ export default function Login() {
           </button>
         </form>
 
-        {/* FOOTER */}
-        <div className="mt-6 pt-4 border-t text-center text-sm text-gray-500">
-          Chưa có tài khoản?{" "}
-          <Link to="/signup" className="text-blue-600 font-medium">
-            Đăng ký ngay
-          </Link>
-        </div>
       </div>
     </div>
   );
