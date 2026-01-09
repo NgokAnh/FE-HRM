@@ -131,6 +131,34 @@ export async function existsWorkSchedule(employeeId, shiftId, workDate) {
 }
 
 /**
+ * 🆕 API V2: Lấy tất cả work schedules theo ca với attendance đã JOIN (1 API call thay vì 206 calls)
+ * GET /api/v2/work-schedules/weekly-by-shift?startDate=YYYY-MM-DD&endDate=YYYY-MM-DD
+ * @param {string} startDate - Ngày bắt đầu (YYYY-MM-DD)
+ * @param {string} endDate - Ngày kết thúc (YYYY-MM-DD)
+ * @returns {Promise<Object>} { startDate, endDate, shifts: [{ shift, dailySchedules }] }
+ */
+export async function getWeeklySchedulesByShift(startDate, endDate) {
+  if (!startDate) throw new Error("startDate is required");
+  if (!endDate) throw new Error("endDate is required");
+
+  console.log("📡 [API V2] Calling weekly-by-shift:", { startDate, endDate });
+
+  // Override baseURL to use v2 endpoint
+  const response = await axiosClient.get(`/v2${BASE_URL}/weekly-by-shift`, {
+    baseURL: 'http://localhost:8080/api',
+    params: { startDate, endDate }
+  });
+
+  const data = extractData(response);
+  console.log("📦 [API V2] Weekly shift schedules response:", {
+    shiftCount: data?.shifts?.length || 0,
+    dateRange: `${data?.startDate} ~ ${data?.endDate}`
+  });
+
+  return data;
+}
+
+/**
  * Lấy danh sách phân công làm việc của một ca trong khoảng thời gian
  * GET /api/v1/work-schedules/shift/{shiftId}/date-range?startDate=...&endDate=...
  * @param {number} shiftId - ID của ca làm việc
