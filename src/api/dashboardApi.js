@@ -2,6 +2,23 @@
 import axiosClient from "./axiosClient";
 import { getAttendanceSummaryCompanyV2 } from "../api/attendanceApi";
 
+function getCurrentWeekRangeVN() {
+  const now = new Date(
+    new Date().toLocaleString("en-US", { timeZone: "Asia/Ho_Chi_Minh" })
+  );
+
+  const day = now.getDay() || 7; // CN = 7
+  const monday = new Date(now);
+  monday.setDate(now.getDate() - day + 1);
+
+  const sunday = new Date(monday);
+  sunday.setDate(monday.getDate() + 6);
+
+  return {
+    startDate: monday.toISOString().slice(0, 10),
+    endDate: sunday.toISOString().slice(0, 10),
+  };
+}
 /* =============================
    EMPLOYEE STATS
    ============================= */
@@ -52,46 +69,10 @@ export async function getInactiveEmployees() {
    ATTENDANCE SUMMARY (v2)
    TOÀN CÔNG TY – weekly-summary
    ============================= */
-export async function getAttendanceSummaryV2(startDate, endDate) {
-  if (!startDate || !endDate) {
-    console.warn("⚠️ Missing startDate or endDate");
-    return { totalDays: 0, overtime: 0, late: 0, earlyLeave: 0 };
-  }
+export async function getAttendanceSummaryThisWeek() {
+  const { startDate, endDate } = getCurrentWeekRangeVN();
 
-  try {
-    const response = await axiosClient.get(
-      "/attendances/weekly-summary",
-      {
-        baseURL: "/api/v2", // 👈 override baseURL
-        params: { startDate, endDate },
-      }
-    );
-
-    const employees = response.data?.employees ?? [];
-
-    const summary = {
-      totalDays: 0,
-      overtime: 0,     // hours
-      late: 0,         // count
-      earlyLeave: 0,   // count
-    };
-
-    employees.forEach(({ statistics }) => {
-      if (!statistics) return;
-
-      summary.totalDays += statistics.worked?.count || 0;
-      summary.overtime +=
-        (statistics.overtime?.totalMinutes || 0) / 60;
-      summary.late += statistics.late?.count || 0;
-      summary.earlyLeave += statistics.earlyLeave?.count || 0;
-    });
-
-    console.log("📊 Attendance summary (v2):", summary);
-    return summary;
-  } catch (error) {
-    console.error("❌ Attendance summary v2 error:", error);
-    return { totalDays: 0, overtime: 0, late: 0, earlyLeave: 0 };
-  }
+  return getAttendanceSummaryCompanyV2(startDate, endDate);
 }
 
 /* =============================
@@ -178,8 +159,6 @@ export async function getSalarySummary() {
    DASHBOARD AGGREGATION
    ============================= */
 export async function getDashboardData() {
-  const WORK_SCHEDULE_ID = "CURRENT"; // 👈 đổi theo thực tế backend
-
   const [
     totalEmployees,
     newEmployees,
@@ -190,9 +169,10 @@ export async function getDashboardData() {
     getTotalEmployees(),
     getNewEmployees(),
     getInactiveEmployees(),
-    getAttendanceSummaryCompanyV2(WORK_SCHEDULE_ID),
+    getAttendanceSummaryThisWeek(), // ✅ TUẦN
     getSalarySummary()
   ]);
+
 
   return {
     totalEmployees,

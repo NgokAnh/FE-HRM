@@ -1,64 +1,94 @@
-import axiosClient from "./axiosClient";
+import axiosClient, { axiosV2 } from "./axiosClient";
 
 const BASE_URL = "/attendances";
 
-// Helper extract data
+/* ===================== Helpers ===================== */
 const extractData = (response) => {
   const body = response.data;
-  return body && typeof body === "object" && "data" in body ? body.data : body;
+  return body && typeof body === "object" && "data" in body
+    ? body.data
+    : body;
 };
 
+/* ===================== API v1 ===================== */
 /**
  * Lấy attendance của nhân viên theo workSchedule
  * GET /api/v1/attendances/my/{workScheduleId}?employeeId={employeeId}
  */
-export async function getAttendanceByWorkSchedule(workScheduleId, employeeId) {
-  if (!workScheduleId) throw new Error("workScheduleId is required");
-  if (!employeeId) throw new Error("employeeId is required");
+export async function getAttendanceByWorkSchedule(
+  workScheduleId,
+  employeeId
+) {
+  if (!workScheduleId) {
+    throw new Error("workScheduleId is required");
+  }
+
+  if (!employeeId) {
+    throw new Error("employeeId is required");
+  }
 
   try {
     const response = await axiosClient.get(
-      `${BASE_URL}/my/${workScheduleId}?employeeId=${employeeId}`
+      `${BASE_URL}/my/${workScheduleId}`,
+      {
+        params: { employeeId },
+      }
     );
+
     return extractData(response);
   } catch (error) {
-    if (error.response?.status === 404) return null;
+    if (error.response?.status === 404) {
+      return null;
+    }
     throw error;
   }
 }
 
-
+/* ===================== API v2 ===================== */
 /**
- * Tóm tắt chấm công TOÀN CÔNG TY (v2 – backend summary)
+ * Tóm tắt chấm công TOÀN CÔNG TY
  * GET /api/v2/attendances/weekly-summary
  */
-export async function getAttendanceSummaryCompanyV2(startDate, endDate) {
-  const response = await axiosClient.get(
-    `${BASE_URL}/weekly-summary`,
+export async function getAttendanceSummaryCompanyV2(
+  startDate,
+  endDate
+) {
+  if (!startDate || !endDate) {
+    return {
+      totalDays: 0,
+      overtime: 0,
+      late: 0,
+      earlyLeave: 0,
+    };
+  }
+
+  const response = await axiosV2.get(
+    "/attendances/weekly-summary",
     {
-      baseURL: "/api/v2", // 👈 override baseURL CHỈ cho request này
       params: { startDate, endDate },
     }
   );
 
-  const employees = response.data?.employees ?? [];
+  const employees = response.data?.data?.employees ?? [];
 
-  const summary = {
-    totalDays: 0,
-    overtime: 0,     // hours
-    late: 0,         // count
-    earlyLeave: 0,   // count
-  };
+  return employees.reduce(
+    (acc, { statistics }) => {
+      if (!statistics) return acc;
 
-  employees.forEach(({ statistics }) => {
-    if (!statistics) return;
+      acc.totalDays += statistics.worked?.count ?? 0;
+      acc.overtime +=
+        (statistics.overtime?.totalMinutes ?? 0) / 60;
+      acc.late += statistics.late?.count ?? 0;
+      acc.earlyLeave +=
+        statistics.earlyLeave?.count ?? 0;
 
-    summary.totalDays += statistics.worked?.count || 0;
-    summary.overtime += (statistics.overtime?.totalMinutes || 0) / 60;
-    summary.late += statistics.late?.count || 0;
-    summary.earlyLeave += statistics.earlyLeave?.count || 0;
-  });
-
-  console.log("📊 COMPANY attendance summary (v2):", summary);
-  return summary;
+      return acc;
+    },
+    {
+      totalDays: 0,
+      overtime: 0,
+      late: 0,
+      earlyLeave: 0,
+    }
+  );
 }
