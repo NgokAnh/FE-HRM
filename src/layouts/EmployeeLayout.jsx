@@ -11,13 +11,13 @@ export default function EmployeeLayout() {
       </aside>
 
       {/* Main content */}
-      <main className="flex-1 flex flex-col overflow-y-auto relative">
-        {/* Outlet */}
-        <div className="flex-1 overflow-y-auto p-4 md:p-6">
+      <main className="flex-1 flex flex-col overflow-hidden relative">
+        {/* Outlet - Thêm padding-bottom cho mobile để tránh bị che bởi BottomNav */}
+        <div className="flex-1 overflow-y-auto p-4 md:p-6 pb-24 md:pb-6">
           <Outlet />
         </div>
 
-        {/* Bottom navigation */}
+        {/* Bottom navigation - fixed ở bottom trên mobile */}
         <BottomNav />
       </main>
     </div>
