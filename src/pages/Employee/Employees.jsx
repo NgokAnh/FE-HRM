@@ -231,10 +231,6 @@ export default function Employees() {
                     onClick={(e) => e.stopPropagation()}
                   >
                     <ActionIcon
-                      icon="visibility"
-                      onClick={() => setSelectedEmployee(emp)}
-                    />
-                    <ActionIcon
                       icon="edit"
                       onClick={() => setSelectedEmployee(emp)}
                     />

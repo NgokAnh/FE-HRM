@@ -4,7 +4,7 @@ import { createEmployee, updateEmployeeBasicInfo } from "../../api/employeeApi";
 export default function EmployeeModal({ mode = "add", employee, onClose, onSaved }) {
   const isEdit = mode === "edit";
 
-  // placeholder theo trạng thái hiện tại của employee
+  // --- Placeholder cho các field ---
   const placeholders = useMemo(() => {
     const e = employee || {};
     return {
@@ -22,12 +22,13 @@ export default function EmployeeModal({ mode = "add", employee, onClose, onSaved
     hiredDate: "",
     status: "ACTIVE",
   });
-
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
-  // ✅ Khi mở modal (hoặc đổi selectedEmployee), đổ data vào form
+  // ✅ Log khi modal mount
   useEffect(() => {
+    console.log("🟢 EmployeeModal mounted", { mode, employee });
+
     if (!isEdit) {
       setForm({
         fullname: "",
@@ -44,46 +45,51 @@ export default function EmployeeModal({ mode = "add", employee, onClose, onSaved
       fullname: employee?.fullname ?? "",
       email: employee?.email ?? "",
       phone: employee?.phone ?? "",
-      hiredDate: employee?.hiredDate ?? "", // BE trả "2025-12-20" hoặc null
+      hiredDate: employee?.hiredDate ?? "",
       status: (employee?.status ?? "ACTIVE").toString().toUpperCase(),
     });
     setError("");
   }, [isEdit, employee]);
 
   const onChange = (key) => (e) => {
-    setForm((prev) => ({ ...prev, [key]: e.target.value }));
+    const value = e.target.value;
+    setForm((prev) => ({ ...prev, [key]: value }));
+    console.log("✏️ Field changed:", key, value);
   };
 
   const handleSubmit = async () => {
+    console.log("🚀 handleSubmit called", { isEdit, form });
     try {
       setLoading(true);
       setError("");
 
       if (isEdit) {
-        // PUT /employees/{id}/basic-info
-        await updateEmployeeBasicInfo(employee.id, {
+        const payload = {
           ...employee,
           fullname: form.fullname || null,
           email: form.email || null,
           phone: form.phone || null,
           hiredDate: form.hiredDate || null,
           status: form.status || "ACTIVE",
-        });
+        };
+        console.log("✏️ [UPDATE] Sending payload:", payload);
+        await updateEmployeeBasicInfo(employee.id, payload);
       } else {
-        // POST /employees
-        // ReqCreateEmpDTO của bạn có thể cần thêm password/role... tuỳ BE
-        await createEmployee({
+        const payload = {
           fullname: form.fullname,
           email: form.email,
           phone: form.phone,
           hiredDate: form.hiredDate || null,
           status: form.status || "ACTIVE",
-          // password: "...", // nếu BE bắt buộc thì bạn thêm vào form
-        });
+        };
+        console.log("✏️ [CREATE] Sending payload:", payload);
+        await createEmployee(payload);
       }
 
+      console.log("✅ Submit successful");
       onSaved?.();
     } catch (e) {
+      console.error("❌ [EmployeeModal] Submit error:", e);
       setError(e?.message || "Lưu thất bại");
     } finally {
       setLoading(false);
@@ -158,7 +164,6 @@ export default function EmployeeModal({ mode = "add", employee, onClose, onSaved
             </select>
           </Field>
 
-          {/* Role hiện BE trả null -> để đọc thôi */}
           <Field label="Chức vụ (Role)">
             <input
               value={employee?.role?.name ?? employee?.role?.code ?? ""}
@@ -180,7 +185,7 @@ export default function EmployeeModal({ mode = "add", employee, onClose, onSaved
           </button>
 
           <button
-            onClick={handleSubmit}
+            onClick={() => { console.log("🔥 Clicked Lưu"); handleSubmit(); }}
             className="px-4 py-2 rounded-lg bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-60"
             disabled={loading}
           >

@@ -1,6 +1,4 @@
 export default function SalaryChart({ data }) {
-  console.log("📊 SalaryChart data:", data);
-
   if (!data || data.length === 0) {
     return (
       <div className="text-sm text-gray-500 dark:text-gray-400">
