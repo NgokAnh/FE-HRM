@@ -20,3 +20,26 @@ export function logout() {
 export function isAuthenticated() {
   return !!getAccessToken() && !!getUser();
 }
+
+/**
+ * Lấy thông tin user từ localStorage
+ */
+export function getCurrentUser() {
+  const userStr = localStorage.getItem("user"); // key lưu user object
+  if (!userStr) return null;
+
+  try {
+    return JSON.parse(userStr);
+  } catch (err) {
+    console.error("Failed to parse user from localStorage", err);
+    return null;
+  }
+}
+
+/**
+ * Lấy employeeId từ user lưu trong localStorage
+ */
+export function getCurrentUserId() {
+  const user = getCurrentUser();
+  return user?.id ?? null;
+}

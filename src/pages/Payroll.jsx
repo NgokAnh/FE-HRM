@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { getSalaries } from "../api/salaryApi";
+import { getSalaries, calculateSalary } from "../api/salaryApi";
 
 /* ==================== COMPONENT CHÍNH ==================== */
 export default function Payroll() {
@@ -47,7 +47,7 @@ export default function Payroll() {
           };
         }
         acc[key].totalEmployee += 1;
-        acc[key].totalSalary += Number(item.finalSalary || 0); // camelCase đúng với API
+        acc[key].totalSalary += Number(item.finalSalary || 0);
         return acc;
       }, {});
 
@@ -112,6 +112,30 @@ export default function Payroll() {
     setPage(1);
   };
 
+  // 🔹 Tạo kỳ lương mới
+  const handleCreatePayroll = async () => {
+    try {
+      setLoading(true);
+      setError("");
+
+      const today = new Date();
+      const payload = {
+        month: today.getMonth() + 1,
+        year: today.getFullYear(),
+      };
+
+      await calculateSalary(payload); // gọi API tính lương
+
+      // Reload dữ liệu sau khi tạo kỳ lương mới
+      fetchData();
+    } catch (err) {
+      console.error("Lỗi khi tạo kỳ lương:", err);
+      setError(err.message || "Lỗi khi tạo kỳ lương mới");
+    } finally {
+      setLoading(false);
+    }
+  };
+
   // Lấy danh sách các năm có trong dữ liệu để fill select
   const availableYears = Array.from(
     new Set(allPayrolls.map((p) => p.fiscalYear.replace("Năm ", "")))
@@ -127,7 +151,10 @@ export default function Payroll() {
             <span className="material-symbols-outlined">download</span>
             Xuất file
           </button>
-          <button className="flex items-center gap-2 px-4 py-2 rounded-lg bg-blue-600 text-white hover:bg-blue-700">
+          <button
+            onClick={handleCreatePayroll} // 🔹 gắn hàm tính lương
+            className="flex items-center gap-2 px-4 py-2 rounded-lg bg-blue-600 text-white hover:bg-blue-700"
+          >
             <span className="material-symbols-outlined">add</span>
             Tạo kỳ lương mới
           </button>

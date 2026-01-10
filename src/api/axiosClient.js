@@ -24,6 +24,15 @@ const axiosV2 = axios.create({
   withCredentials: true,
 });
 
+const axiosNoVersion = axios.create({
+  baseURL: "http://localhost:8080/api", // KHÔNG có /v1 hay /v2
+  headers: {
+    "Content-Type": "application/json",
+  },
+  withCredentials: true,
+});
+
+
 /* =======================
    INTERCEPTOR DÙNG CHUNG
    ======================= */
@@ -88,5 +97,6 @@ attachInterceptors(axiosV2);
 /* =======================
    EXPORT
    ======================= */
+export { axiosNoVersion };
 export { axiosV2 };
 export default axiosClient;

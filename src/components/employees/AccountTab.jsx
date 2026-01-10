@@ -1,11 +1,6 @@
 import { useState } from "react";
 import { resetEmployeePassword } from "../../api/employeeApi";
 
-const ROLE_OPTIONS = [
-  { id: 1, name: "ADMIN" },
-  { id: 2, name: "EMPLOYEE" },
-];
-
 export default function AccountTab({ mode = "add", employee, form, onChange }) {
   const isEdit = mode === "edit";
   const [loading, setLoading] = useState(false);
@@ -21,7 +16,8 @@ export default function AccountTab({ mode = "add", employee, form, onChange }) {
       await resetEmployeePassword(employee.id, { newPassword: "123456" });
       alert("Mật khẩu đã được reset về 123456");
     } catch (e) {
-      setError("Reset mật khẩu thất bại");
+      const msg = e.response?.data?.message || "Reset mật khẩu thất bại";
+      setError(msg);
     } finally {
       setLoading(false);
     }
@@ -42,22 +38,13 @@ export default function AccountTab({ mode = "add", employee, form, onChange }) {
         />
       </Field>
 
-      {/* ROLE */}
+      {/* ROLE - chỉ hiển thị, không chỉnh sửa */}
       <Field label="Chức vụ">
-        <select
+        <input
           value={isEdit ? employee?.role?.name || "" : form.role || ""}
-          onChange={(e) => onChange("role", e.target.value)}
-          className="w-full px-4 py-2 rounded-lg border"
-        >
-          <option value="">
-            {isEdit && employee?.role?.name ? employee.role.name : "Chọn chức vụ"}
-          </option>
-          {ROLE_OPTIONS.map((role) => (
-            <option key={role.id} value={role.name}>
-              {role.name}
-            </option>
-          ))}
-        </select>
+          disabled
+          className="w-full px-4 py-2 rounded-lg border bg-gray-100 text-gray-600"
+        />
       </Field>
 
       {/* ===== EDIT MODE ===== */}
@@ -76,7 +63,7 @@ export default function AccountTab({ mode = "add", employee, form, onChange }) {
             disabled={loading}
             className="bg-orange-600 text-white px-5 py-2 rounded-lg"
           >
-            Reset mật khẩu về 123456
+            {loading ? "Đang reset..." : "Reset mật khẩu về 123456"}
           </button>
         </>
       )}
@@ -89,7 +76,8 @@ export default function AccountTab({ mode = "add", employee, form, onChange }) {
               type="password"
               value={form.password}
               onChange={(e) => onChange("password", e.target.value)}
-              className="w-full px-4 py-2 rounded-lg border"
+              placeholder="Mật khẩu mặc định là số điện thoại của nhân viên"
+              className="w-full px-4 py-2 rounded-lg border text-gray-600"
             />
           </Field>
 
@@ -98,7 +86,8 @@ export default function AccountTab({ mode = "add", employee, form, onChange }) {
               type="password"
               value={form.confirmPassword}
               onChange={(e) => onChange("confirmPassword", e.target.value)}
-              className="w-full px-4 py-2 rounded-lg border"
+              placeholder="Nhập lại mật khẩu (không bắt buộc)"
+              className="w-full px-4 py-2 rounded-lg border text-gray-600"
             />
           </Field>
         </>

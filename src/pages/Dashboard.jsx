@@ -3,6 +3,7 @@ import StatCard from "../components/StatCard";
 import EmployeeChangeChart from "../components/charts/EmployeeChangeChart";
 import SalaryChart from "../components/charts/SalaryChart";
 import { getDashboardData } from "../api/dashboardApi";
+import { getAttendanceSummaryCompanyV2 } from "../api/attendanceApi";
 
 /* ===================== Utils ===================== */
 const getCurrentWeekRange = () => {
@@ -20,6 +21,22 @@ const getCurrentWeekRange = () => {
   return `${format(start)} - ${format(end)}`;
 };
 
+// Trả về startDate và endDate dạng YYYY-MM-DD cho API
+const getCurrentWeekDates = () => {
+  const today = new Date();
+  const day = today.getDay() || 7;
+
+  const start = new Date(today);
+  start.setDate(today.getDate() - day + 1);
+
+  const end = new Date(start);
+  end.setDate(start.getDate() + 6);
+
+  const formatISO = (d) => d.toISOString().split("T")[0];
+
+  return { startDate: formatISO(start), endDate: formatISO(end) };
+};
+
 /* ===================== Component ===================== */
 export default function Dashboard() {
   const [stats, setStats] = useState({});
@@ -34,14 +51,21 @@ export default function Dashboard() {
 
   useEffect(() => {
     const fetchData = async () => {
+      setError("");
       try {
+        const { startDate, endDate } = getCurrentWeekDates();
+
+        // Lấy dữ liệu dashboard cơ bản
         const data = await getDashboardData();
+
+        // Lấy tóm tắt chấm công tuần hiện tại
+        const attendance = await getAttendanceSummaryCompanyV2(startDate, endDate);
 
         setStats({
           totalEmployees: data.totalEmployees,
           newEmployees: data.newEmployees,
           inactiveEmployees: data.inactiveEmployees,
-          attendance: data.attendance,
+          attendance,
           salary: data.salary,
         });
 
@@ -134,7 +158,7 @@ export default function Dashboard() {
               <div className="animate-spin rounded-full h-10 w-10 border-t-2 border-b-2 border-gray-400 mx-auto" />
             ) : !stats.attendance ? (
               <div className="text-sm text-red-500">
-                ❌ stats.attendance is undefined / null
+                ❌ Không có dữ liệu chấm công
               </div>
             ) : (
               <div className="grid grid-cols-2 gap-4 mb-6">
