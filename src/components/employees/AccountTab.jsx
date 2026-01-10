@@ -13,7 +13,7 @@ export default function AccountTab({ mode = "add", employee, form, onChange }) {
       setLoading(true);
       setError("");
 
-      await resetEmployeePassword(employee.id, { newPassword: "123456" });
+      await resetEmployeePassword(employee.id, 123456);
       alert("Mật khẩu đã được reset về 123456");
     } catch (e) {
       const msg = e.response?.data?.message || "Reset mật khẩu thất bại";

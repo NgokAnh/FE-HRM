@@ -84,16 +84,14 @@ export async function deleteEmployee(id) {
 }
 
 // ===================== ACCOUNT =====================
-export async function resetEmployeePassword(id, payload) {
-  if (!id) throw new Error("id is required");
-  if (!payload?.newPassword) {
-    throw new Error("newPassword is required");
-  }
+export async function resetEmployeePassword(employeeId, newPassword) {
+  if (!employeeId) throw new Error("employeeId is required");
+  if (!newPassword) throw new Error("newPassword is required");
 
-  const response = await axiosClient.put(
-    `${BASE_URL}/${id}/reset-password`,
-    payload
-  );
+  const response = await axiosClient.put(`/auth/reset-password`, {
+    employeeId,
+    newPassword
+  });
 
   return extractData(response);
 }
