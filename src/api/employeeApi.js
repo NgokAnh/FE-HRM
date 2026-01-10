@@ -90,7 +90,7 @@ export async function resetEmployeePassword(id, payload) {
     throw new Error("newPassword is required");
   }
 
-  const response = await axiosClient.post(
+  const response = await axiosClient.put(
     `${BASE_URL}/${id}/reset-password`,
     payload
   );
