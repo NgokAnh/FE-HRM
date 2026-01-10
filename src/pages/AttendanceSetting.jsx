@@ -46,8 +46,8 @@ export default function AttendanceSetting() {
       >
         <span className="material-symbols-outlined">location_on</span>
         {location
-          ? `(${location.lat.toFixed(6)}, ${location.lng.toFixed(6)}) – ${location.radius}m`
-          : "Chọn vị trí"}
+          ? `(${location.lat.toFixed(6)}, ${location.lng.toFixed(6)})`
+          : "Xem vị trí hiện tại"}
       </button>
 
       {loading && (

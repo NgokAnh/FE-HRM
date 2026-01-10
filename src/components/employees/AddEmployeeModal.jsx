@@ -52,73 +52,69 @@ export default function AddEmployeeModal({ onClose, onSaved, mode = "add", emplo
 
   /* ================= SAVE ================= */
   /* ================= SAVE ================= */
-const handleSave = async () => {
-  console.log("🚀 [AddEmployeeModal] handleSave called", { isEdit, form });
-  try {
-    setLoading(true);
-    setError("");
+  const handleSave = async () => {
+    console.log("🚀 [AddEmployeeModal] handleSave called", { isEdit, form });
+    try {
+      setLoading(true);
+      setError("");
 
-    if (!isEdit && (!form.password || form.password !== form.confirmPassword)) {
-      throw new Error("Mật khẩu không khớp");
-    }
+      if (!isEdit && (!form.password || form.password !== form.confirmPassword)) {
+        throw new Error("Mật khẩu không khớp");
+      }
 
-    // --- Build shift-only payload with OT ---
-    const payload = {
-      fullname: form.fullname,
-      email: form.email,
-      phone: form.phone,
-      hiredDate: form.hiredDate,
-      status: form.status,
-      password: !isEdit ? form.password || "123456" : undefined,
+      // --- Build shift-only payload with OT ---
+      const payload = {
+        fullname: form.fullname,
+        email: form.email,
+        phone: form.phone,
+        hiredDate: form.hiredDate,
+        status: form.status,
+        password: !isEdit ? form.password || "123456" : undefined,
+        allowance: Number(form.allowance || 0) || null,
 
-      // Lương theo ca
-      employeeSalaryTypes: [
-        {
+        // Lương theo ca (singular object, không phải array)
+        empSalaryType: {
           salaryType: "SHIFT",
           effectiveFrom: form.hiredDate,
           note: form.note || "",
         },
-      ],
-      shiftRates: [
-        { dayType: "WEEKDAY", baseRate: Number(form.baseSalaryWeekday || 0), note: form.note || "" },
-        { dayType: "SATURDAY", baseRate: Number(form.baseSalarySaturday || 0), note: form.note || "" },
-        { dayType: "SUNDAY", baseRate: Number(form.baseSalarySunday || 0), note: form.note || "" },
-        { dayType: "HOLIDAY", baseRate: Number(form.baseSalaryHoliday || 0), note: form.note || "" },
-      ],
 
-      // OT chung (AFTER_SHIFT)
-      empOtRates: [
-        {
-          otType: "AFTER_SHIFT",
-          dayType: "WEEKDAY", // backend chỉ cần 1 ngày, dùng WEEKDAY làm mặc định
-          rateMultiplier: Number(form.otRate || 1.5),
-          isActive: true,
-          effectiveFrom: form.hiredDate,
-          effectiveTo: null,
-        },
-      ],
+        // Shift rates (đổi tên từ shiftRates → empShiftRates)
+        empShiftRates: [
+          { dayType: "WEEKDAY", baseRate: Number(form.baseSalaryWeekday || 0), note: form.note || "" },
+          { dayType: "SATURDAY", baseRate: Number(form.baseSalarySaturday || 0), note: form.note || "" },
+          { dayType: "SUNDAY", baseRate: Number(form.baseSalarySunday || 0), note: form.note || "" },
+          { dayType: "HOLIDAY", baseRate: Number(form.baseSalaryHoliday || 0), note: form.note || "" },
+        ],
 
-      // Phụ cấp
-      allowance: Number(form.allowance || 0),
-    };
+        // OT rates (đơn giản hóa - KHÔNG gửi otType và dayType)
+        empOtRates: [
+          {
+            rateMultiplier: Number(form.otRate || 1.5),
+            isActive: true,
+            effectiveFrom: form.hiredDate,
+            effectiveTo: null,
+          },
+        ],
+      };
 
-    console.log(isEdit ? "✏️ [UPDATE] Sending payload:" : "✏️ [CREATE] Sending payload:", payload);
+      console.log(isEdit ? "✏️ [UPDATE] Sending payload:" : "✏️ [CREATE] Sending payload:", payload);
 
-    if (isEdit) {
-      await updateEmployeeBasicInfo(employee.id, payload);
-    } else {
-      await createEmployee(payload);
+      if (isEdit) {
+        await updateEmployeeBasicInfo(employee.id, payload);
+      } else {
+        await createEmployee(payload);
+      }
+
+      console.log("✅ [AddEmployeeModal] Submit successful");
+      onSaved?.();
+    } catch (e) {
+      console.error("❌ [AddEmployeeModal] Submit error:", e);
+      setError(e?.message || "Lưu thông tin thất bại");
+    } finally {
+      setLoading(false);
     }
-
-    console.log("✅ [AddEmployeeModal] Submit successful");
-    onSaved?.();
-  } catch (e) {
-    console.error("❌ [AddEmployeeModal] Submit error:", e);
-    setError(e?.message || "Lưu thông tin thất bại");
-  } finally {
-    setLoading(false);
-  }
-};
+  };
 
   /* ================= UI ================= */
   return (

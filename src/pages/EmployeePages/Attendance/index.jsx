@@ -16,6 +16,7 @@ import {
 
 import TodaySchedulesList from "./components/TodaySchedulesList";
 import HistoryItem from "./components/HistoryItem";
+import AttendanceSetting from "../../AttendanceSetting";
 
 import {
   formatTimeHHmm,
@@ -460,6 +461,9 @@ export default function Attendance() {
 
   return (
     <div className="flex-1 flex flex-col relative overflow-y-auto px-4 sm:px-6 lg:px-8 py-6 min-h-0">
+      <div className="flex justify-end mb-2">
+        <AttendanceSetting />
+      </div>
       {error && (
         <div className="mb-4 p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg text-red-600 dark:text-red-400 text-sm whitespace-pre-line flex items-start gap-2">
           <span className="material-symbols-outlined text-red-500 flex-shrink-0 mt-0.5">

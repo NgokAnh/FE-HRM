@@ -17,7 +17,7 @@ L.Icon.Default.mergeOptions({
 /* ===== Const ===== */
 const DEFAULT_CENTER = { lat: 10.8231, lng: 106.6297 }; // TP.HCM
 
-export default function SelectLocationModal({ open, onClose, onConfirm }) {
+export default function SelectLocationModal({ open, onClose, onConfirm, viewOnly = false }) {
   const mapRef = useRef(null);
   const mapInstance = useRef(null);
   const markerRef = useRef(null);
@@ -158,7 +158,9 @@ export default function SelectLocationModal({ open, onClose, onConfirm }) {
   return (
     <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center">
       <div className="bg-white w-[650px] rounded-xl p-4">
-        <h2 className="text-lg font-semibold mb-3">Chọn vị trí chấm công</h2>
+        <h2 className="text-lg font-semibold mb-3">
+          {viewOnly ? "Vị trí hiện tại" : "Chọn vị trí chấm công"}
+        </h2>
 
         {/* ===== Search ===== */}
         <div className="relative mb-3">
@@ -208,19 +210,25 @@ export default function SelectLocationModal({ open, onClose, onConfirm }) {
         {/* ===== Map ===== */}
         <div ref={mapRef} className="w-full h-[400px] rounded" />
 
-        {/* ===== Radius ===== */}
-        <div className="mt-3">
-          <label className="text-sm font-medium block mb-1">Bán kính: {radius} m</label>
-          <input
-            type="range"
-            min={50}
-            max={1000}
-            step={50}
-            value={radius}
-            onChange={(e) => setRadius(Number(e.target.value))}
-            className="w-full"
-          />
-        </div>
+        {!viewOnly && (
+          <>
+            {/* ===== Radius ===== */}
+            <div className="mt-3">
+              <label className="text-sm font-medium block mb-1">
+                Bán kính: {radius} m
+              </label>
+              <input
+                type="range"
+                min={50}
+                max={1000}
+                step={50}
+                value={radius}
+                onChange={(e) => setRadius(Number(e.target.value))}
+                className="w-full"
+              />
+            </div>
+          </>
+        )}
 
         {/* ===== Footer ===== */}
         <div className="flex justify-end gap-2 mt-4">
@@ -228,16 +236,26 @@ export default function SelectLocationModal({ open, onClose, onConfirm }) {
             onClick={onClose}
             className="px-4 py-2 rounded bg-gray-200 hover:bg-gray-300"
           >
-            Hủy
+            {viewOnly ? "Đóng" : "Hủy"}
           </button>
-          <button
-            onClick={() =>
-              onConfirm({ lat: position.lat, lng: position.lng, radius, address: query })
-            }
-            className="px-4 py-2 rounded bg-blue-600 text-white hover:bg-blue-700"
-          >
-            Xác nhận
-          </button>
+          {!viewOnly && (
+            <button
+              onClick={() =>
+                onConfirm({ lat: position.lat, lng: position.lng, radius, address: query })
+              }
+              className="px-4 py-2 rounded bg-blue-600 text-white hover:bg-blue-700"
+            >
+              Xác nhận
+            </button>
+          )}
+          {viewOnly && (
+            <button
+              onClick={() => onConfirm({ lat: position.lat, lng: position.lng, address: query })}
+              className="px-4 py-2 rounded bg-blue-600 text-white hover:bg-blue-700"
+            >
+              Xong
+            </button>
+          )}
         </div>
       </div>
     </div>

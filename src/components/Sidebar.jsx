@@ -9,7 +9,6 @@ const menus = [
   { label: "Chấm công", to: "/admin/attendance", icon: "fact_check" },
   { label: "Lịch làm việc", to: "/admin/schedule", icon: "calendar_month" },
   { label: "Bảng lương", to: "/admin/payroll", icon: "payments" },
-  { label: "Báo cáo", to: "/admin/reports", icon: "bar_chart" },
 ];
 
 export default function Sidebar() {

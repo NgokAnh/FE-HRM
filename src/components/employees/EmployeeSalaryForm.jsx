@@ -8,7 +8,12 @@ export default function EmployeeShiftSalaryForm({ value, onChange }) {
 
   // --- Load dữ liệu khi edit ---
   useEffect(() => {
-    if (!value?.id) return;
+    console.log("🔍 [EmployeeSalaryForm] value changed:", value);
+    if (!value?.id) {
+      console.log("⚠️ [EmployeeSalaryForm] No ID, skip loading");
+      return;
+    }
+    console.log("📡 [EmployeeSalaryForm] Loading employee ID:", value.id);
     loadEmployee(value.id);
   }, [value?.id]);
 
@@ -16,6 +21,7 @@ export default function EmployeeShiftSalaryForm({ value, onChange }) {
     setLoading(true);
     try {
       const data = await getEmployee(id);
+      console.log("📦 [EmployeeSalaryForm] Employee data received:", data);
 
       onChange("salaryType", "shift");
       onChange("note", data.currentSalaryType?.note || "");
@@ -28,7 +34,8 @@ export default function EmployeeShiftSalaryForm({ value, onChange }) {
         baseSalaryHoliday: "",
       };
 
-      (data.empShiftRates || []).forEach((r) => {
+      // Backend trả về activeShiftRates (không phải empShiftRates)
+      (data.activeShiftRates || []).forEach((r) => {
         switch (r.dayType) {
           case "WEEKDAY":
             rates.baseSalaryWeekday = r.baseRate;
@@ -47,18 +54,22 @@ export default function EmployeeShiftSalaryForm({ value, onChange }) {
         }
       });
 
+      console.log("📊 [EmployeeSalaryForm] Parsed rates:", rates);
       onChange("baseSalaryWeekday", rates.baseSalaryWeekday);
       onChange("baseSalarySaturday", rates.baseSalarySaturday);
       onChange("baseSalarySunday", rates.baseSalarySunday);
       onChange("baseSalaryHoliday", rates.baseSalaryHoliday);
 
       // OT chung, chỉ rateMultiplier
+      console.log("🔎 [EmployeeSalaryForm] empOtRates:", data.empOtRates);
       const otRate = (data.empOtRates || []).find(
         (r) => r.otType === "ALL_OT"
       );
+      console.log("💰 [EmployeeSalaryForm] OT rate found:", otRate);
       onChange("otRate", otRate?.rateMultiplier || 1.5); // default 1.5 nếu chưa có
 
-      onChange("allowance", data.currentMonthlySalary?.allowance || "");
+      console.log("💵 [EmployeeSalaryForm] Allowance:", data.allowance);
+      onChange("allowance", data.allowance || "");
     } catch (err) {
       console.error("[EmployeeShiftSalaryForm] Load error:", err);
     } finally {

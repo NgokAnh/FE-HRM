@@ -109,7 +109,6 @@ export default function Attendance() {
           <h1 className="text-2xl font-semibold">Bảng Chấm Công</h1>
         </div>
 
-        <AttendanceSetting />
       </div>
 
       {/* FILTER */}
@@ -119,10 +118,10 @@ export default function Attendance() {
             Theo ngày
           </FilterButton>
           <FilterButton active={view === "week"} icon="date_range" onClick={() => setView("week")}>
-            Tuần này
+            Theo tuần
           </FilterButton>
           <FilterButton active={view === "month"} icon="calendar_month" onClick={() => setView("month")}>
-            Tháng này
+            Theo tháng
           </FilterButton>
 
           {/* Date Picker - chỉ hiện khi view === "day" */}
@@ -179,7 +178,7 @@ export default function Attendance() {
           )}
         </div>
 
-        <div className="flex gap-4">
+        {/* <div className="flex gap-4">
           <div className="flex items-center gap-2 bg-gray-100 px-4 py-2 rounded-lg flex-1">
             <span className="material-symbols-outlined text-gray-500">search</span>
             <input
@@ -192,7 +191,7 @@ export default function Attendance() {
             <span className="material-symbols-outlined">check</span>
             Duyệt mục đã chọn
           </button>
-        </div>
+        </div> */}
       </div>
 
       {/* TABLE */}

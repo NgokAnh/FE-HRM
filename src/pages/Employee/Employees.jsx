@@ -143,9 +143,9 @@ export default function Employees() {
           </button>
 
           {/* APPLY */}
-          <button className="px-4 py-2 rounded-lg bg-blue-600 text-white">
+          {/* <button className="px-4 py-2 rounded-lg bg-blue-600 text-white">
             Áp dụng
-          </button>
+          </button> */}
         </div>
 
         <div className="flex gap-3">
